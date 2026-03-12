@@ -1,7 +1,8 @@
 import json
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+import pandas as pd
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session
 
 from app.core.logging import get_logger
@@ -70,6 +71,10 @@ def mark_run_failed(db: Session, run: TaskRun, error_message: str) -> TaskRun:
 
 
 def _execute_by_task_type(task: TaskDefinition) -> dict[str, str | None]:
+    block_mode_result = _run_block_mode_if_any(task)
+    if block_mode_result is not None:
+        return block_mode_result
+
     if task.task_type == "python":
         return run_python_task(task.python_code, task.params_json)
     if task.task_type == "sql":
@@ -111,6 +116,97 @@ def _extract_mail_options(task: TaskDefinition) -> tuple[bool, str | None, str |
     subject_tpl = params.get("mail_subject") if isinstance(params.get("mail_subject"), str) else None
     recipients_csv = params.get("mail_recipients") if isinstance(params.get("mail_recipients"), str) else None
     return send, subject_tpl, recipients_csv
+
+
+def _replace_tokens(text_value: str | None, vars_map: dict[str, str]) -> str:
+    out = text_value or ""
+    for k, v in vars_map.items():
+        out = out.replace("{" + str(k) + "}", str(v))
+    return out
+
+
+def _query_to_dataframe(sql_text: str, db_url: str) -> pd.DataFrame:
+    engine = create_engine(db_url, future=True)
+    with engine.connect() as conn:
+        return pd.read_sql(text(sql_text), conn)
+
+
+def _render_df_table_html(df: pd.DataFrame) -> str:
+    if df is None or df.empty:
+        return "<p>(조회 결과 없음)</p>"
+    return df.to_html(index=False, border=1, justify="center")
+
+
+def _run_block_mode_if_any(task: TaskDefinition) -> dict[str, str | None] | None:
+    if not task.params_json:
+        return None
+    try:
+        params = json.loads(task.params_json)
+    except Exception:
+        return None
+    if not isinstance(params, dict):
+        return None
+
+    sql_blocks = params.get("sql_blocks")
+    if not isinstance(sql_blocks, list) or not sql_blocks:
+        return None
+
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    db_url = settings.sql_runner_database_url or settings.database_url
+    gvars = _runtime_vars()
+
+    sections: list[str] = []
+    block_rows: list[dict] = []
+
+    for i, raw in enumerate(sql_blocks, start=1):
+        if not isinstance(raw, dict):
+            continue
+        title = str(raw.get("title") or f"블록{i}")
+        sql_tpl = str(raw.get("sql") or "").strip()
+        sql = _replace_tokens(sql_tpl, gvars)
+        html_tpl = str(raw.get("html_tpl") or "").strip()
+        py_code = str(raw.get("py_code") or "").strip()
+
+        if not sql:
+            continue
+
+        try:
+            df = _query_to_dataframe(sql, db_url)
+            block_rows.append({"title": title, "rows": len(df)})
+            html_table = _render_df_table_html(df)
+
+            body = html_tpl or "<h3>{title}</h3>{html_table}"
+            body = body.replace("{title}", title).replace("{html_table}", html_table)
+            body = _replace_tokens(body, gvars)
+
+            # optional block python post-process: can override html via RESULT_HTML/html var
+            if py_code:
+                loc = {"df": df, "gvars": gvars, "html": body, "RESULT_HTML": None}
+                exec(py_code, {"__builtins__": __builtins__}, loc)
+                for key in ("RESULT_HTML", "result_html", "html"):
+                    val = loc.get(key)
+                    if isinstance(val, str) and val.strip():
+                        body = val
+                        break
+
+            sections.append(f"<section><h2>{title}</h2>{body}</section>")
+        except Exception as exc:
+            sections.append(f"<section><h2>{title}</h2><pre>실행 오류: {exc}</pre></section>")
+
+    if not sections:
+        return None
+
+    combined_html = "<html><body>" + "<hr/>".join(sections) + "</body></html>"
+    payload_json = {"mode": "block", "blocks": block_rows}
+    return {
+        "summary": f"Block mode executed ({len(sections)} sections)",
+        "artifact_type": "html",
+        "content_text": None,
+        "content_json": json.dumps(payload_json, ensure_ascii=False),
+        "content_html": combined_html,
+    }
 
 
 def run_task(db: Session, task_id: int, trigger_type: str = "manual") -> TaskRun:
