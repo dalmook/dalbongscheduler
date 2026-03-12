@@ -16,6 +16,7 @@
 - 결과물 API: `/artifacts`, `/artifacts/{artifact_id}`, `/tasks/{task_id}/artifacts`
 - HTML Preview API: `/artifacts/{artifact_id}/preview`
 - 파일 업로드 API: `POST /files/upload`, `GET /files`
+- SQL 결과 엑셀 다운로드 API: `GET /artifacts/{artifact_id}/download.xlsx`
 - Dashboard API: `/dashboard/summary`, `/dashboard/jobs`, `/dashboard/html-results`
 - Health API: `/health`
 

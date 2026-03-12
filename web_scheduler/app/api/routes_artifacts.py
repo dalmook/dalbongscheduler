@@ -1,5 +1,9 @@
+import io
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
+from openpyxl import Workbook
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -34,6 +38,47 @@ def get_artifact_api(artifact_id: int, db: Session = Depends(get_db)) -> TaskArt
 def list_task_artifacts_api(task_id: int, db: Session = Depends(get_db)) -> list[TaskArtifactListItem]:
     artifacts = list_artifacts(db, task_id=task_id)
     return [TaskArtifactListItem.model_validate(item) for item in artifacts]
+
+
+@router.get("/artifacts/{artifact_id}/download.xlsx")
+def download_artifact_excel_api(artifact_id: int, db: Session = Depends(get_db)) -> StreamingResponse:
+    try:
+        artifact = get_artifact(db, artifact_id)
+    except TaskArtifactNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    rows: list[dict] = []
+    if artifact.content_json:
+        try:
+            payload = json.loads(artifact.content_json)
+            if isinstance(payload, dict) and isinstance(payload.get("rows"), list):
+                rows = [r for r in payload["rows"] if isinstance(r, dict)]
+        except Exception:
+            rows = []
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "result"
+
+    if rows:
+        headers = list(rows[0].keys())
+        ws.append(headers)
+        for r in rows:
+            ws.append([r.get(h) for h in headers])
+    else:
+        ws.append(["message"])
+        ws.append(["No tabular rows found in artifact.content_json"])
+
+    out = io.BytesIO()
+    wb.save(out)
+    out.seek(0)
+
+    filename = f"artifact_{artifact_id}.xlsx"
+    return StreamingResponse(
+        out,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @router.get("/artifacts/{artifact_id}/preview", response_class=HTMLResponse)

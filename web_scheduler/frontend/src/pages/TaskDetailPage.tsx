@@ -55,27 +55,27 @@ function TaskDetailPage() {
   return (
     <div className="stack">
       <div className="row between">
-        <h1>Task #{task.id}</h1>
-        <button className="btn" onClick={() => navigate("/tasks")}>Back</button>
+        <h1>작업 #{task.id}</h1>
+        <button className="btn" onClick={() => navigate("/tasks")}>목록</button>
       </div>
       <div className="card">
-        <p><b>name:</b> {task.name}</p>
-        <p><b>type:</b> {task.task_type}</p>
-        <p><b>schedule:</b> {task.schedule_type}</p>
-        <p><b>timezone:</b> {task.timezone ?? "-"}</p>
-        <p><b>next_run_at:</b> {task.next_run_at ?? "-"}</p>
-        <button className="btn primary" onClick={execute}>Run Now</button>
+        <p><b>이름:</b> {task.name}</p>
+        <p><b>유형:</b> {task.task_type}</p>
+        <p><b>스케줄:</b> {task.schedule_type}</p>
+        <p><b>시간대:</b> {task.timezone ?? "-"}</p>
+        <p><b>다음 실행:</b> {task.next_run_at ?? "-"}</p>
+        <button className="btn primary" onClick={execute}>지금 실행</button>
       </div>
 
       <div className="card">
-        <h3>Code</h3>
+        <h3>코드</h3>
         <pre>{task.python_code || task.sql_code || task.html_template || "(none)"}</pre>
       </div>
 
-      <h3>Runs</h3>
+      <h3>실행 이력</h3>
       <RunTable rows={runs} onDetail={() => {}} />
 
-      <h3>Artifacts</h3>
+      <h3>결과물 (엑셀 다운로드 가능)</h3>
       <ArtifactTable rows={artifacts} onPreview={setSelectedArtifact} />
       <HtmlPreviewPanel artifact={selectedArtifact} />
     </div>

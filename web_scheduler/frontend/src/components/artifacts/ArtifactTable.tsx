@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "../../api/client";
 import type { Artifact } from "../../types/artifact";
 
 function ArtifactTable({ rows, onPreview }: { rows: Artifact[]; onPreview: (artifact: Artifact) => void }) {
@@ -6,13 +7,13 @@ function ArtifactTable({ rows, onPreview }: { rows: Artifact[]; onPreview: (arti
       <thead>
         <tr>
           <th>ID</th>
-          <th>Task</th>
-          <th>Run</th>
-          <th>Type</th>
-          <th>Version</th>
-          <th>Latest</th>
-          <th>Created</th>
-          <th>Actions</th>
+          <th>작업</th>
+          <th>실행</th>
+          <th>유형</th>
+          <th>버전</th>
+          <th>최신</th>
+          <th>생성시각</th>
+          <th>동작</th>
         </tr>
       </thead>
       <tbody>
@@ -25,7 +26,10 @@ function ArtifactTable({ rows, onPreview }: { rows: Artifact[]; onPreview: (arti
             <td>{a.version_no}</td>
             <td>{String(a.is_latest)}</td>
             <td>{a.created_at}</td>
-            <td><button className="btn" onClick={() => onPreview(a)}>Preview</button></td>
+            <td className="row">
+              <button className="btn" onClick={() => onPreview(a)}>미리보기</button>
+              <a className="btn" href={`${API_BASE_URL}/artifacts/${a.id}/download.xlsx`} target="_blank" rel="noreferrer">엑셀</a>
+            </td>
           </tr>
         ))}
       </tbody>
