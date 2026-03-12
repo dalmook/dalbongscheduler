@@ -1,13 +1,21 @@
-import { artifactPreviewUrl } from "../../api/artifacts";
+import type { Artifact } from "../../types/artifact";
+import { getArtifactPreviewUrl } from "../../api/artifacts";
 
-function HtmlPreviewPanel({ artifactId }: { artifactId: number | null }) {
-  if (!artifactId) {
-    return <div className="state-box">Select artifact to preview</div>;
+function HtmlPreviewPanel({ artifact }: { artifact: Artifact | null }) {
+  if (!artifact) return <div className="state">Select artifact to preview</div>;
+
+  if (artifact.artifact_type === "html") {
+    return (
+      <div className="preview-wrap">
+        <iframe className="preview-iframe" src={getArtifactPreviewUrl(artifact.id)} title="preview" />
+      </div>
+    );
   }
 
+  const text = artifact.content_text || artifact.content_json || "(no preview content)";
   return (
-    <div className="preview-panel">
-      <iframe title="html-preview" src={artifactPreviewUrl(artifactId)} className="preview-iframe" />
+    <div className="card">
+      <pre>{text}</pre>
     </div>
   );
 }

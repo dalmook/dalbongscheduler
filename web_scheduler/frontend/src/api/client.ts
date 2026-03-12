@@ -1,38 +1,29 @@
+import type { ApiError } from "../types/common";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
 
 type Method = "GET" | "POST" | "PUT" | "DELETE";
 
-export async function apiRequest<T>(path: string, method: Method = "GET", body?: unknown): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+export async function request<T>(path: string, method: Method = "GET", body?: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     method,
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  if (!response.ok) {
-    let detail = `Request failed: ${response.status}`;
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
     try {
-      const data = (await response.json()) as { detail?: string };
-      if (data.detail) {
-        detail = data.detail;
-      }
+      const data = (await res.json()) as ApiError;
+      if (data.detail) message = data.detail;
     } catch {
-      // ignore parse error
+      // ignore
     }
-    throw new Error(detail);
+    throw new Error(message);
   }
 
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return (await response.json()) as T;
-}
-
-export async function healthCheck(): Promise<{ status: string; service: string; db: string }> {
-  return apiRequest("/health");
+  if (res.status === 204) return undefined as T;
+  return (await res.json()) as T;
 }
 
 export { API_BASE_URL };

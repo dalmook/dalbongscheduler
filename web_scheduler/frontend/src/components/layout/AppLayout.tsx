@@ -1,24 +1,24 @@
 import { Outlet } from "react-router-dom";
-import { useEffect, useState } from "react";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
-import { healthCheck } from "../../api/client";
+import { useEffect, useState } from "react";
+import { getHealth } from "../../api/health";
 
 function AppLayout() {
-  const [healthStatus, setHealthStatus] = useState("checking");
+  const [health, setHealth] = useState("checking");
 
   useEffect(() => {
-    healthCheck()
-      .then((res) => setHealthStatus(res.status))
-      .catch(() => setHealthStatus("error"));
+    getHealth()
+      .then((res) => setHealth(res.status))
+      .catch(() => setHealth("error"));
   }, []);
 
   return (
     <div className="layout">
       <Sidebar />
-      <div className="content-wrap">
-        <Topbar healthStatus={healthStatus} />
-        <main className="page-content">
+      <div className="main-wrap">
+        <Topbar health={health} />
+        <main className="content">
           <Outlet />
         </main>
       </div>

@@ -1,81 +1,56 @@
-# web_scheduler (Phase 3)
+# web_scheduler (Phase 4)
 
-`dalbongscheduler`의 tkinter 코드와 분리된 FastAPI 기반 백엔드 프로젝트입니다.
+`dalbongscheduler`에서 분리한 웹 스케줄러 프로젝트입니다.
 
-현재 단계는 **3단계: 자동 스케줄 등록(APScheduler) + 대시보드 API** 입니다.
-
----
-
-## 1. 3단계 목표
-
-- `manual / cron / interval` 스케줄 타입을 지원
-- `cron/interval + enabled=true` 작업을 APScheduler에 자동 등록
-- 작업 생성/수정/삭제 시 scheduler 상태 즉시 반영
-- 운영자가 상태를 확인할 수 있는 대시보드 API 제공
+현재 단계는 **4단계: 관리자 프론트엔드 추가** 입니다.
+- 기존 FastAPI 백엔드 API를 그대로 사용
+- 운영자가 브라우저에서 Task / Run / Artifact / HTML Preview를 조회/관리
 
 ---
 
-## 2. 현재 구현 범위
+## 1) 현재 구현 범위
 
-### 포함
-- Task CRUD: `POST/GET/GET{id}/PUT/DELETE /tasks`
-- 수동 실행: `POST /tasks/{task_id}/run`
-- 실행 이력: `GET /runs`, `GET /runs/{run_id}`, `GET /tasks/{task_id}/runs`
-- 결과물 조회/미리보기:
-  - `GET /artifacts`
-  - `GET /artifacts/{artifact_id}`
-  - `GET /tasks/{task_id}/artifacts`
-  - `GET /artifacts/{artifact_id}/preview`
-- 자동 스케줄 등록/동기화:
-  - startup sync
-  - task 기반 register/update/remove
-- Dashboard API:
-  - `GET /dashboard/summary`
-  - `GET /dashboard/jobs`
-  - `GET /dashboard/html-results`
+### 백엔드 (기존 유지)
+- Task CRUD API: `/tasks`
+- 수동 실행 API: `POST /tasks/{task_id}/run`
+- 실행 이력 API: `/runs`, `/runs/{run_id}`, `/tasks/{task_id}/runs`
+- 결과물 API: `/artifacts`, `/artifacts/{artifact_id}`, `/tasks/{task_id}/artifacts`
+- HTML Preview API: `/artifacts/{artifact_id}/preview`
+- Health API: `/health`
 
-### 제외
-- 프론트엔드 관리자 화면
-- 실제 외부 SQL DB 실행 연결(현재 SQL runner는 mock)
-- 메일/메신저 등 delivery 연동
+### 프론트엔드 (신규)
+- Dashboard 페이지
+- Tasks 페이지 (검색/필터, 생성/수정/삭제, 수동 실행)
+- Task Detail 페이지 (task/runs/artifacts/preview)
+- Runs 페이지 (필터 + 상세 모달)
+- HTML Results 페이지 (artifact 조회 + preview)
 
 ---
 
-## 3. 자동 실행 지원 범위
+## 2) 폴더 구조
 
-- `manual`: 스케줄러 등록 안 함 (수동 실행 전용)
-- `cron`: 크론 표현식 기반 등록
-- `interval`: 초 단위 간격 등록 (최소 10초)
-
-### 등록 규칙
-- `is_enabled=true` + `schedule_type in (cron, interval)` -> 등록
-- `is_enabled=false` 또는 `schedule_type=manual` -> 제거
-- startup 시 DB task 전체와 scheduler job 동기화
-- job id 형식: `task:{task_id}`
-
----
-
-## 4. 대시보드 API 설명
-
-### `GET /dashboard/summary`
-- 총 task 수, enabled 수, scheduled 수
-- 최근 24시간 success/failed run 수
-- 최근 html artifact 수
-- 다음 예정 실행 목록
-- 최근 실패 실행 목록
-
-### `GET /dashboard/jobs`
-- 현재 scheduler 등록 job 목록
-- `job_id`, `task_id`, `task_name`, `trigger`, `next_run_time`, `is_enabled`
-
-### `GET /dashboard/html-results`
-- html task 기준 최신 결과 요약
-- `preview_text`(HTML 태그 제거 후 축약)
-- 최근 성공/실패 시각
+```text
+web_scheduler/
+  app/                 # FastAPI backend
+  tests/               # pytest tests
+  frontend/            # React + Vite + TypeScript admin UI
+    src/
+      app/
+      api/
+      types/
+      pages/
+      components/
+      styles/
+  .env.example
+  requirements.txt
+  README.md
+```
 
 ---
 
-## 5. 실행 방법 (Windows CMD 기준)
+## 3) Windows CMD 기준 실행 방법
+
+## 3-1. 백엔드 실행
 
 ```cmd
 cd web_scheduler
@@ -86,99 +61,98 @@ copy .env.example .env
 uvicorn app.main:app --reload
 ```
 
-접속:
+- Backend: `http://127.0.0.1:8000`
 - Swagger: `http://127.0.0.1:8000/docs`
-- Health: `http://127.0.0.1:8000/health`
+
+## 3-2. 프론트엔드 실행
+
+```cmd
+cd web_scheduler\frontend
+npm install
+copy .env.example .env
+npm run dev
+```
+
+- Frontend: `http://127.0.0.1:5173`
 
 ---
 
-## 6. 환경 변수
+## 4) 프론트 환경변수
+
+`frontend/.env.example`
+
+```env
+VITE_API_BASE_URL=http://127.0.0.1:8000
+```
+
+---
+
+## 5) 주요 화면 설명
+
+### Dashboard
+- `/health`, `/tasks`, `/runs`, `/artifacts`를 조합해 요약 표시
+- 총 작업 수, 활성 작업 수, 최근 성공/실패, 최근 실행/HTML 결과 확인
+
+### Tasks
+- `name / task_type / is_enabled` 검색
+- task 생성/수정 모달
+- 수동 실행 버튼
+- 삭제 전 확인 다이얼로그
+
+### Task Detail
+- 작업 기본 정보 + 코드 보기
+- task별 run/artifact 목록
+- HTML artifact preview
+
+### Runs
+- `task_id / status / trigger_type` 필터
+- 실행 이력 상세 모달(result_summary/error_message)
+
+### HTML Results
+- artifact 목록/필터(task_id)
+- html/text/json 결과 미리보기
+
+---
+
+## 6) CORS
+
+프론트 로컬 개발 주소 허용:
+- `http://localhost:5173`
+- `http://127.0.0.1:5173`
 
 `.env.example`:
 
 ```env
-APP_NAME=web_scheduler
-APP_ENV=local
-APP_HOST=0.0.0.0
-APP_PORT=8000
-DATABASE_URL=sqlite:///./web_scheduler.db
-LOG_LEVEL=INFO
-DEFAULT_TIMEZONE=Asia/Seoul
 CORS_ALLOW_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
-> CORS는 추후 프론트 개발을 위한 기본값입니다.
-
 ---
 
-## 7. cron / interval 예시
-
-### cron 예시 3개
-- `0 9 * * *` (매일 09:00)
-- `*/15 * * * *` (15분마다)
-- `30 8 * * 1-5` (평일 08:30)
-
-### interval 예시 2개
-- `30` (30초마다)
-- `300` (5분마다)
-
----
-
-## 8. Windows CMD용 샘플 curl
-
-### 8-1) cron task 생성
-```cmd
-curl -X POST "http://127.0.0.1:8000/tasks" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"name\":\"daily_html_report\",\"task_type\":\"html\",\"schedule_type\":\"cron\",\"cron_expr\":\"*/15 * * * *\",\"html_template\":\"<h1>Hello</h1>\",\"is_enabled\":true}"
-```
-
-### 8-2) interval task 생성
-```cmd
-curl -X POST "http://127.0.0.1:8000/tasks" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"name\":\"interval_python_report\",\"task_type\":\"python\",\"schedule_type\":\"interval\",\"interval_seconds\":30,\"python_code\":\"print('hi')\",\"is_enabled\":true}"
-```
-
-### 8-3) 수동 실행
-```cmd
-curl -X POST "http://127.0.0.1:8000/tasks/1/run"
-```
-
-### 8-4) 대시보드 조회
-```cmd
-curl "http://127.0.0.1:8000/dashboard/summary"
-curl "http://127.0.0.1:8000/dashboard/jobs"
-curl "http://127.0.0.1:8000/dashboard/html-results"
-```
-
----
-
-## 9. 테스트
+## 7) 품질 확인 명령
 
 ```cmd
+:: backend
+python -m compileall app tests
 pytest -q
-```
 
-테스트 포함 항목:
-- health
-- task CRUD
-- manual run / artifact
-- scheduler job 등록/미등록/갱신/제거
-- dashboard summary/jobs/html-results
+:: frontend
+cd frontend
+npm run build
+```
 
 ---
 
-## 10. 다음 단계 TODO
+## 8) 다음 단계 TODO
 
-- [ ] 프론트엔드 관리자 화면
+- [ ] APScheduler 실제 자동 등록 강화
+- [ ] dashboard 전용 백엔드 집계 API 고도화
 - [ ] 실제 SQL DB 연결
 - [ ] delivery channel(email/knox/webhook)
 - [ ] 권한관리 / 감사로그
 
 ---
 
-## (참고) Linux/macOS 최소 실행 명령
+## (참고) Linux/macOS 최소 실행
 
 ```bash
 python -m venv .venv

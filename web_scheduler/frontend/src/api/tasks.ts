@@ -1,41 +1,41 @@
-import { apiRequest } from "./client";
-import type { Task, TaskCreatePayload, TaskUpdatePayload } from "../types/task";
+import type { Artifact } from "../types/artifact";
 import type { Run } from "../types/run";
-import type { ArtifactListItem } from "../types/artifact";
+import type { Task, TaskCreatePayload, TaskUpdatePayload } from "../types/task";
+import { request } from "./client";
 
-export async function fetchTasks(params?: { name?: string; task_type?: string; is_enabled?: string }): Promise<Task[]> {
-  const query = new URLSearchParams();
-  if (params?.name) query.set("name", params.name);
-  if (params?.task_type) query.set("task_type", params.task_type);
-  if (params?.is_enabled) query.set("is_enabled", params.is_enabled);
-  const qs = query.toString();
-  return apiRequest<Task[]>(`/tasks${qs ? `?${qs}` : ""}`);
+export function listTasks(params?: { name?: string; task_type?: string; is_enabled?: string }) {
+  const q = new URLSearchParams();
+  if (params?.name) q.set("name", params.name);
+  if (params?.task_type) q.set("task_type", params.task_type);
+  if (params?.is_enabled) q.set("is_enabled", params.is_enabled);
+  const qs = q.toString();
+  return request<Task[]>(`/tasks${qs ? `?${qs}` : ""}`);
 }
 
-export async function fetchTask(taskId: number): Promise<Task> {
-  return apiRequest<Task>(`/tasks/${taskId}?include_recent_runs=true`);
+export function getTask(taskId: number) {
+  return request<Task>(`/tasks/${taskId}?include_recent_runs=true`);
 }
 
-export async function createTask(payload: TaskCreatePayload): Promise<Task> {
-  return apiRequest<Task>("/tasks", "POST", payload);
+export function createTask(payload: TaskCreatePayload) {
+  return request<Task>("/tasks", "POST", payload);
 }
 
-export async function updateTask(taskId: number, payload: TaskUpdatePayload): Promise<Task> {
-  return apiRequest<Task>(`/tasks/${taskId}`, "PUT", payload);
+export function updateTask(taskId: number, payload: TaskUpdatePayload) {
+  return request<Task>(`/tasks/${taskId}`, "PUT", payload);
 }
 
-export async function deleteTask(taskId: number): Promise<{ message: string }> {
-  return apiRequest<{ message: string }>(`/tasks/${taskId}`, "DELETE");
+export function removeTask(taskId: number) {
+  return request<{ message: string }>(`/tasks/${taskId}`, "DELETE");
 }
 
-export async function runTask(taskId: number): Promise<{ task_id: number; run_id: number; status: string; message: string }> {
-  return apiRequest(`/tasks/${taskId}/run`, "POST");
+export function runTask(taskId: number) {
+  return request<{ task_id: number; run_id: number; status: string; message: string }>(`/tasks/${taskId}/run`, "POST");
 }
 
-export async function fetchTaskRuns(taskId: number): Promise<Run[]> {
-  return apiRequest<Run[]>(`/tasks/${taskId}/runs`);
+export function listTaskRuns(taskId: number) {
+  return request<Run[]>(`/tasks/${taskId}/runs`);
 }
 
-export async function fetchTaskArtifacts(taskId: number): Promise<ArtifactListItem[]> {
-  return apiRequest<ArtifactListItem[]>(`/tasks/${taskId}/artifacts`);
+export function listTaskArtifacts(taskId: number) {
+  return request<Artifact[]>(`/tasks/${taskId}/artifacts`);
 }

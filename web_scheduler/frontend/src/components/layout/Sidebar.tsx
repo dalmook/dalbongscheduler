@@ -13,12 +13,7 @@ function Sidebar() {
       <h2>web_scheduler</h2>
       <nav>
         {menus.map((menu) => (
-          <NavLink
-            key={menu.to}
-            to={menu.to}
-            className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-            end={menu.to === "/"}
-          >
+          <NavLink key={menu.to} to={menu.to} end={menu.to === "/"} className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
             {menu.label}
           </NavLink>
         ))}

@@ -1,18 +1,19 @@
 # web_scheduler frontend
 
-## Run
+## Windows CMD 실행
 
-```bash
+```cmd
+cd web_scheduler\frontend
 npm install
-cp .env.example .env
+copy .env.example .env
 npm run dev
 ```
 
-- Default URL: `http://localhost:5173`
-- Backend API base: `VITE_API_BASE_URL` (default `http://127.0.0.1:8000`)
+- Frontend URL: `http://127.0.0.1:5173`
+- Backend API URL: `VITE_API_BASE_URL` (기본 `http://127.0.0.1:8000`)
 
 ## Build
 
-```bash
+```cmd
 npm run build
 ```

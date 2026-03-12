@@ -1,81 +1,69 @@
 import { useEffect, useState } from "react";
-import { fetchRun, fetchRuns } from "../api/runs";
-import EmptyState from "../components/common/EmptyState";
-import ErrorState from "../components/common/ErrorState";
-import Loading from "../components/common/Loading";
-import RunTable from "../components/runs/RunTable";
+import { getRun, listRuns } from "../api/runs";
 import type { Run } from "../types/run";
+import Loading from "../components/common/Loading";
+import ErrorState from "../components/common/ErrorState";
+import EmptyState from "../components/common/EmptyState";
+import RunTable from "../components/runs/RunTable";
+import RunDetailModal from "../components/runs/RunDetailModal";
 
 function RunsPage() {
-  const [runs, setRuns] = useState<Run[]>([]);
-  const [selectedRun, setSelectedRun] = useState<Run | null>(null);
+  const [rows, setRows] = useState<Run[]>([]);
+  const [selected, setSelected] = useState<Run | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [taskIdFilter, setTaskIdFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [triggerTypeFilter, setTriggerTypeFilter] = useState("");
+  const [taskId, setTaskId] = useState("");
+  const [status, setStatus] = useState("");
+  const [trigger, setTrigger] = useState("");
 
-  const loadRuns = async () => {
+  const load = async () => {
     setLoading(true);
     setError("");
     try {
-      const data = await fetchRuns({
-        task_id: taskIdFilter || undefined,
-        status: statusFilter || undefined,
-        trigger_type: triggerTypeFilter || undefined,
-      });
-      setRuns(data);
-    } catch (err) {
-      setError((err as Error).message);
+      const data = await listRuns({ task_id: taskId || undefined, status: status || undefined, trigger_type: trigger || undefined });
+      setRows(data);
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    void loadRuns();
-  }, []);
+  useEffect(() => { void load(); }, []);
 
-  const handleSelectRun = async (run: Run) => {
+  const openDetail = async (run: Run) => {
     try {
-      const detail = await fetchRun(run.id);
-      setSelectedRun(detail);
-    } catch (err) {
-      setError((err as Error).message);
+      const detail = await getRun(run.id);
+      setSelected(detail);
+    } catch (e) {
+      setError((e as Error).message);
     }
   };
 
   return (
-    <div className="page-grid">
+    <div className="stack">
       <h1>Runs</h1>
-      <div className="toolbar">
-        <input className="input" placeholder="task_id" value={taskIdFilter} onChange={(e) => setTaskIdFilter(e.target.value)} />
-        <select className="input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+      {error && <ErrorState message={error} />}
+      <div className="row">
+        <input className="input" placeholder="task_id" value={taskId} onChange={(e) => setTaskId(e.target.value)} />
+        <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">all status</option>
           <option value="queued">queued</option>
           <option value="running">running</option>
           <option value="success">success</option>
           <option value="failed">failed</option>
         </select>
-        <select className="input" value={triggerTypeFilter} onChange={(e) => setTriggerTypeFilter(e.target.value)}>
+        <select className="input" value={trigger} onChange={(e) => setTrigger(e.target.value)}>
           <option value="">all trigger</option>
           <option value="manual">manual</option>
           <option value="scheduled">scheduled</option>
         </select>
-        <button className="btn" onClick={loadRuns}>Search</button>
+        <button className="btn" onClick={load}>Search</button>
       </div>
 
-      {error && <ErrorState message={error} />}
-      {loading ? <Loading /> : runs.length ? <RunTable runs={runs} onSelect={handleSelectRun} /> : <EmptyState message="No runs found" />}
-
-      {selectedRun && (
-        <div className="card">
-          <h3>Run Detail #{selectedRun.id}</h3>
-          <p>result_summary: {selectedRun.result_summary ?? "-"}</p>
-          <p>error_message: {selectedRun.error_message ?? "-"}</p>
-        </div>
-      )}
+      {loading ? <Loading /> : rows.length ? <RunTable rows={rows} onDetail={openDetail} /> : <EmptyState text="No runs" />}
+      <RunDetailModal run={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }

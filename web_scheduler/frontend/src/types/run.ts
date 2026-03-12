@@ -10,10 +10,3 @@ export interface Run {
   error_message?: string | null;
   created_at: string;
 }
-
-export interface RunStartResponse {
-  task_id: number;
-  run_id: number;
-  status: string;
-  message: string;
-}

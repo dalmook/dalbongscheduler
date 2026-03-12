@@ -3,13 +3,13 @@ import type { Task } from "../../types/task";
 import StatusBadge from "../common/StatusBadge";
 
 interface Props {
-  tasks: Task[];
-  onRun: (id: number) => void;
+  rows: Task[];
+  onRun: (task: Task) => void;
   onEdit: (task: Task) => void;
   onDelete: (task: Task) => void;
 }
 
-function TaskTable({ tasks, onRun, onEdit, onDelete }: Props) {
+function TaskTable({ rows, onRun, onEdit, onDelete }: Props) {
   return (
     <table className="table">
       <thead>
@@ -20,12 +20,11 @@ function TaskTable({ tasks, onRun, onEdit, onDelete }: Props) {
           <th>Schedule</th>
           <th>Enabled</th>
           <th>Last Run</th>
-          <th>Next Run</th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody>
-        {tasks.map((task) => (
+        {rows.map((task) => (
           <tr key={task.id}>
             <td>{task.id}</td>
             <td>{task.name}</td>
@@ -36,10 +35,9 @@ function TaskTable({ tasks, onRun, onEdit, onDelete }: Props) {
               <StatusBadge value={task.last_run_status} />
               <div className="muted">{task.last_run_at ?? "-"}</div>
             </td>
-            <td>{task.next_run_at ?? "-"}</td>
-            <td className="actions">
-              <Link to={`/tasks/${task.id}`} className="btn">Detail</Link>
-              <button className="btn" onClick={() => onRun(task.id)}>Run</button>
+            <td className="row">
+              <Link className="btn" to={`/tasks/${task.id}`}>Detail</Link>
+              <button className="btn" onClick={() => onRun(task)}>Run</button>
               <button className="btn" onClick={() => onEdit(task)}>Edit</button>
               <button className="btn danger" onClick={() => onDelete(task)}>Delete</button>
             </td>

@@ -1,12 +1,7 @@
 import type { Run } from "../../types/run";
 import StatusBadge from "../common/StatusBadge";
 
-interface Props {
-  runs: Run[];
-  onSelect: (run: Run) => void;
-}
-
-function RunTable({ runs, onSelect }: Props) {
+function RunTable({ rows, onDetail }: { rows: Run[]; onDetail: (run: Run) => void }) {
   return (
     <table className="table">
       <thead>
@@ -17,12 +12,12 @@ function RunTable({ runs, onSelect }: Props) {
           <th>Status</th>
           <th>Started</th>
           <th>Finished</th>
-          <th>Duration(ms)</th>
-          <th></th>
+          <th>Duration</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
-        {runs.map((run) => (
+        {rows.map((run) => (
           <tr key={run.id}>
             <td>{run.id}</td>
             <td>{run.task_id}</td>
@@ -31,7 +26,7 @@ function RunTable({ runs, onSelect }: Props) {
             <td>{run.started_at ?? "-"}</td>
             <td>{run.finished_at ?? "-"}</td>
             <td>{run.duration_ms ?? "-"}</td>
-            <td><button className="btn" onClick={() => onSelect(run)}>View</button></td>
+            <td><button className="btn" onClick={() => onDetail(run)}>Detail</button></td>
           </tr>
         ))}
       </tbody>

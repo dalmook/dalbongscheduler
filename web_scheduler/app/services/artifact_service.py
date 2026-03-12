@@ -1,4 +1,4 @@
-from sqlalchemy import func, select, update
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.orm import Session
 
 from app.db.models import TaskArtifact
@@ -63,6 +63,28 @@ def get_artifact(db: Session, artifact_id: int) -> TaskArtifact:
     if not artifact:
         raise TaskArtifactNotFoundError("Artifact not found")
     return artifact
+
+
+def get_latest_artifact_for_task(db: Session, task_id: int) -> TaskArtifact | None:
+    return db.execute(
+        select(TaskArtifact)
+        .where(and_(TaskArtifact.task_id == task_id, TaskArtifact.is_latest.is_(True)))
+        .order_by(TaskArtifact.created_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+
+
+def build_preview_text(content: str | None, limit: int = 240) -> str | None:
+    if not content:
+        return None
+
+    import re
+
+    text = re.sub(r"<[^>]+>", "", content)
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) <= limit:
+        return text
+    return f"{text[:limit]}..."
 
 
 def to_artifact_response(artifact: TaskArtifact) -> TaskArtifactResponse:

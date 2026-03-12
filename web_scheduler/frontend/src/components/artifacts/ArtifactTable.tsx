@@ -1,11 +1,6 @@
-import type { ArtifactListItem } from "../../types/artifact";
+import type { Artifact } from "../../types/artifact";
 
-interface Props {
-  artifacts: ArtifactListItem[];
-  onPreview: (artifactId: number) => void;
-}
-
-function ArtifactTable({ artifacts, onPreview }: Props) {
+function ArtifactTable({ rows, onPreview }: { rows: Artifact[]; onPreview: (artifact: Artifact) => void }) {
   return (
     <table className="table">
       <thead>
@@ -17,20 +12,20 @@ function ArtifactTable({ artifacts, onPreview }: Props) {
           <th>Version</th>
           <th>Latest</th>
           <th>Created</th>
-          <th></th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
-        {artifacts.map((artifact) => (
-          <tr key={artifact.id}>
-            <td>{artifact.id}</td>
-            <td>{artifact.task_id}</td>
-            <td>{artifact.run_id}</td>
-            <td>{artifact.artifact_type}</td>
-            <td>{artifact.version_no}</td>
-            <td>{String(artifact.is_latest)}</td>
-            <td>{artifact.created_at}</td>
-            <td>{artifact.artifact_type === "html" && <button className="btn" onClick={() => onPreview(artifact.id)}>Preview</button>}</td>
+        {rows.map((a) => (
+          <tr key={a.id}>
+            <td>{a.id}</td>
+            <td>{a.task_id}</td>
+            <td>{a.run_id}</td>
+            <td>{a.artifact_type}</td>
+            <td>{a.version_no}</td>
+            <td>{String(a.is_latest)}</td>
+            <td>{a.created_at}</td>
+            <td><button className="btn" onClick={() => onPreview(a)}>Preview</button></td>
           </tr>
         ))}
       </tbody>

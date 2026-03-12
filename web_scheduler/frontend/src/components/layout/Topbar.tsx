@@ -1,12 +1,12 @@
-interface TopbarProps {
-  healthStatus: string;
+interface Props {
+  health: string;
 }
 
-function Topbar({ healthStatus }: TopbarProps) {
+function Topbar({ health }: Props) {
   return (
     <header className="topbar">
-      <div className="topbar-title">Scheduler Admin</div>
-      <div className={`health-pill ${healthStatus === "ok" ? "ok" : "error"}`}>API: {healthStatus}</div>
+      <div className="top-title">web_scheduler admin</div>
+      <div className={`health ${health === "ok" ? "ok" : "error"}`}>Health: {health}</div>
     </header>
   );
 }
