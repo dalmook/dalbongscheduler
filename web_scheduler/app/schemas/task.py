@@ -6,6 +6,7 @@ from app.schemas.run import TaskRunListItem
 
 TASK_TYPES = {"python", "sql", "html"}
 SCHEDULE_TYPES = {"manual", "cron", "interval"}
+MIN_INTERVAL_SECONDS = 10
 
 
 class TaskBase(BaseModel):
@@ -16,6 +17,7 @@ class TaskBase(BaseModel):
     cron_expr: str | None = None
     interval_seconds: int | None = Field(default=None, gt=0)
     is_enabled: bool = True
+    timezone: str | None = "Asia/Seoul"
 
     python_code: str | None = None
     sql_code: str | None = None
@@ -32,8 +34,11 @@ class TaskBase(BaseModel):
 
         if self.schedule_type == "cron" and not self.cron_expr:
             raise ValueError("cron_expr is required when schedule_type is 'cron'")
-        if self.schedule_type == "interval" and not self.interval_seconds:
-            raise ValueError("interval_seconds is required when schedule_type is 'interval'")
+        if self.schedule_type == "interval":
+            if not self.interval_seconds:
+                raise ValueError("interval_seconds is required when schedule_type is 'interval'")
+            if self.interval_seconds < MIN_INTERVAL_SECONDS:
+                raise ValueError(f"interval_seconds must be >= {MIN_INTERVAL_SECONDS}")
 
         return self
 
@@ -50,6 +55,7 @@ class TaskUpdate(BaseModel):
     cron_expr: str | None = None
     interval_seconds: int | None = Field(default=None, gt=0)
     is_enabled: bool | None = None
+    timezone: str | None = None
 
     python_code: str | None = None
     sql_code: str | None = None
@@ -66,8 +72,11 @@ class TaskUpdate(BaseModel):
 
         if self.schedule_type == "cron" and self.cron_expr is None:
             raise ValueError("cron_expr is required when updating schedule_type to 'cron'")
-        if self.schedule_type == "interval" and self.interval_seconds is None:
-            raise ValueError("interval_seconds is required when updating schedule_type to 'interval'")
+        if self.schedule_type == "interval":
+            if self.interval_seconds is None:
+                raise ValueError("interval_seconds is required when updating schedule_type to 'interval'")
+            if self.interval_seconds < MIN_INTERVAL_SECONDS:
+                raise ValueError(f"interval_seconds must be >= {MIN_INTERVAL_SECONDS}")
 
         return self
 
@@ -78,6 +87,8 @@ class TaskListItem(BaseModel):
     task_type: str
     schedule_type: str
     is_enabled: bool
+    timezone: str | None
+    next_run_at: datetime | None
     created_at: datetime
     updated_at: datetime
 
@@ -93,6 +104,9 @@ class TaskResponse(BaseModel):
     cron_expr: str | None
     interval_seconds: int | None
     is_enabled: bool
+    timezone: str | None
+    next_run_at: datetime | None
+    scheduler_job_id: str | None
     python_code: str | None
     sql_code: str | None
     html_template: str | None

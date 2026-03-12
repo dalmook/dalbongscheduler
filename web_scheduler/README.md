@@ -1,32 +1,31 @@
 # web_scheduler
 
 `dalbongscheduler`의 tkinter 코드와 분리된 웹 백엔드 프로젝트입니다.  
-현재는 **2단계(수동 실행 + 실행 이력 + 결과물 저장)** 기준으로 구현되어 있습니다.
+현재는 **3단계(APScheduler 자동 실행 + 대시보드 API)** 기준으로 구현되어 있습니다.
 
-## 1. 프로젝트 목적
+## 1. 3단계 목표
 
-- 기존 스케줄러를 웹 구조로 전환하기 위한 백엔드 기반 구축
-- 사용자가 웹에서 등록한 `python/sql/html` task를 저장하고 수동 실행
-- 실행 결과를 `TaskRun`/`TaskArtifact`로 DB에 기록
-- 추후 APScheduler 자동 실행, 대시보드, 권한/감사 기능을 붙일 수 있도록 구조 유지
+- 기존 수동 실행(2단계)을 유지하면서 자동 실행(cron/interval)을 실제 동작 상태로 확장
+- TaskDefinition 수정/삭제 시 scheduler 상태가 즉시 반영되도록 동기화
+- 운영 관리를 위한 대시보드 API 제공
+  - 전체 요약
+  - 현재 등록 job 목록
+  - HTML 결과 요약
 
 ---
 
-## 2. 현재 구현 범위 (2단계)
+## 2. 현재 지원 범위
 
-### 포함
-- TaskDefinition CRUD API (`/tasks`)
-- 수동 실행 API (`POST /tasks/{task_id}/run`)
-- 실행 이력 API (`/runs`, `/runs/{id}`, `/tasks/{task_id}/runs`)
-- 결과물 API (`/artifacts`, `/artifacts/{id}`, `/tasks/{task_id}/artifacts`)
-- HTML preview API (`/artifacts/{id}/preview`)
-- SQLite 기본 사용, PostgreSQL 전환 가능한 설정
-- APScheduler lifecycle + enabled task sync 대상 로그
+### 스케줄 타입
+- `manual`: APScheduler 등록 안 함, 수동 실행만 가능
+- `cron`: APScheduler에 cron trigger로 등록
+- `interval`: APScheduler에 interval trigger로 등록
 
-### 제외(다음 단계)
-- cron/interval 실제 자동 실행 등록
-- 외부 DB 실제 SQL 실행(현재 mock)
-- 사내 연동(메일/메신저/Oracle 등)
+### 자동 실행 등록 규칙
+- `is_enabled=true` + `schedule_type in (cron, interval)` → 등록
+- `is_enabled=false` 또는 `schedule_type=manual` → 제거
+- task 수정 시 스케줄 변경 자동 반영
+- task 삭제 시 scheduler job 제거
 
 ---
 
@@ -40,6 +39,7 @@ web_scheduler/
       routes_tasks.py
       routes_runs.py
       routes_artifacts.py
+      routes_dashboard.py
     core/
       config.py
       logging.py
@@ -57,11 +57,13 @@ web_scheduler/
       task.py
       run.py
       artifact.py
+      dashboard.py
     services/
       task_service.py
       execution_service.py
       artifact_service.py
       scheduler_service.py
+      dashboard_service.py
       exceptions.py
     utils/
       time_utils.py
@@ -71,6 +73,7 @@ web_scheduler/
     test_health.py
     test_tasks.py
     test_runs_and_artifacts.py
+    test_scheduler_dashboard.py
   .env.example
   requirements.txt
   README.md
@@ -78,37 +81,35 @@ web_scheduler/
 
 ---
 
-## 4. 데이터 모델
+## 4. 주요 데이터 모델
 
 ### TaskDefinition
-- 작업 정의(코드/스케줄/상태) 저장
+핵심 필드:
+- `schedule_type`, `cron_expr`, `interval_seconds`, `is_enabled`
+- `timezone` (기본 Asia/Seoul)
+- `next_run_at`
+- `scheduler_job_id`
+- `last_run_status`, `last_run_at`
 
 ### TaskRun
-- 작업 실행 이력 저장
-- status: `queued/running/success/failed`
-- started_at, finished_at, duration_ms, error_message 등 포함
+- 수동/자동 실행 이력 저장 (`trigger_type=manual|scheduled`)
+- 상태(`queued/running/success/failed`)와 실행 시간 정보 저장
 
 ### TaskArtifact
-- 실행 결과물 버전 저장
-- 새 artifact 저장 시 기존 `is_latest=true`는 false로 변경
-- task 단위 `version_no` 자동 증가
+- 실행 결과물 버전 관리
+- 신규 artifact 저장 시 기존 latest 해제 + version 증가
 
 ---
 
-## 5. 실행 흐름
+## 5. Scheduler 동작 구조
 
-1. `/tasks/{id}/run` 호출
-2. `TaskRun(status=queued)` 생성
-3. `running` 전환 + 시작시각 기록
-4. task_type에 맞는 runner 호출
-   - python: 제한된 exec + print/result 수집
-   - sql: mock 실행 결과 생성
-   - html: Jinja2 렌더링
-5. `TaskArtifact` 생성
-6. `TaskRun success/failed` 마무리
-7. `TaskDefinition.last_run_status/last_run_at` 갱신
+1. 앱 시작 시 `init_scheduler()` → `start_scheduler()` → `sync_enabled_tasks()`
+2. DB의 task를 읽어 등록/제거 동기화
+3. job id는 `task:{task_id}` 형식
+4. 스케줄 트리거 시 내부적으로 `run_task(..., trigger_type="scheduled")` 호출
+5. 실행 성공/실패와 관계없이 scheduler thread는 계속 동작 (예외는 로그 처리)
 
-> 참고: Python runner는 현재 내부 운영/신뢰된 코드 전제를 둔 최소 제한 실행입니다.
+> 현재 구조는 단일 프로세스 기준입니다.
 
 ---
 
@@ -128,33 +129,17 @@ uvicorn app.main:app --reload
 
 ---
 
-## 7. 환경 변수 (.env.example)
+## 7. API 요약
 
-```env
-APP_NAME=web_scheduler
-APP_ENV=local
-APP_HOST=0.0.0.0
-APP_PORT=8000
-DATABASE_URL=sqlite:///./web_scheduler.db
-LOG_LEVEL=INFO
-DEFAULT_TIMEZONE=Asia/Seoul
-```
-
-PostgreSQL 전환 예시:
-```env
-DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/web_scheduler
-```
-
----
-
-## 8. API 요약
-
+### 기본/작업
 - `GET /health`
 - `POST /tasks`
 - `GET /tasks`
 - `GET /tasks/{task_id}` (`include_recent_runs=true` 지원)
 - `PUT /tasks/{task_id}`
 - `DELETE /tasks/{task_id}`
+
+### 실행/결과
 - `POST /tasks/{task_id}/run`
 - `GET /runs`
 - `GET /runs/{run_id}`
@@ -164,63 +149,47 @@ DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/web_scheduler
 - `GET /tasks/{task_id}/artifacts`
 - `GET /artifacts/{artifact_id}/preview`
 
----
-
-## 9. 샘플 호출
-
-### 9-1) Python task 생성
-
-```bash
-curl -X POST http://127.0.0.1:8000/tasks \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "python_daily_report",
-    "description": "일간 리포트",
-    "task_type": "python",
-    "schedule_type": "manual",
-    "python_code": "print(\"hello report\")\nresult={\"summary\":\"ok\",\"artifact_type\":\"text\",\"content_text\":\"done\"}",
-    "params_json": "{\"target_date\":\"2026-01-01\"}",
-    "output_format": "text"
-  }'
-```
-
-### 9-2) Python task 수동 실행
-
-```bash
-curl -X POST http://127.0.0.1:8000/tasks/1/run
-```
-
-### 9-3) HTML task 생성
-
-```bash
-curl -X POST http://127.0.0.1:8000/tasks \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "html_notice",
-    "description": "공지 렌더링",
-    "task_type": "html",
-    "schedule_type": "manual",
-    "html_template": "<html><body><h1>{{ title }}</h1><p>{{ body }}</p></body></html>",
-    "params_json": "{\"title\":\"Hello\",\"body\":\"World\"}",
-    "output_format": "html"
-  }'
-```
-
-### 9-4) HTML preview 확인
-
-1) 먼저 실행 결과 artifact id 확인
-```bash
-curl http://127.0.0.1:8000/tasks/2/artifacts
-```
-
-2) 브라우저에서 preview URL 접속
-```text
-http://127.0.0.1:8000/artifacts/{artifact_id}/preview
-```
+### 대시보드
+- `GET /dashboard/summary`
+- `GET /dashboard/jobs`
+- `GET /dashboard/html-results`
 
 ---
 
-## 10. 테스트
+## 8. Cron/Interval 예시
+
+### Cron 예시 3개
+- `0 9 * * *` : 매일 09:00
+- `*/15 * * * *` : 15분마다
+- `30 8 * * 1-5` : 평일 08:30
+
+### Interval 예시 2개
+- `30` : 30초마다
+- `300` : 5분마다
+
+> interval 최소값은 10초로 제한합니다.
+
+---
+
+## 9. task 생성 후 자동 등록 흐름
+
+1. `POST /tasks` 호출
+2. `schedule_type`이 `cron/interval`이고 `is_enabled=true`이면
+3. task 저장 직후 scheduler에 즉시 등록
+4. `TaskDefinition.next_run_at`, `scheduler_job_id` 갱신
+5. `/dashboard/jobs`에서 즉시 확인 가능
+
+---
+
+## 10. 주의사항
+
+- 현재 scheduler는 **단일 프로세스** 기준입니다.
+- 멀티 인스턴스/분산 실행(리더 선출, 중복 실행 방지)은 아직 미구현입니다.
+- SQL runner는 현재 외부 DB 연결 없는 **mock 실행기**입니다.
+
+---
+
+## 11. 테스트
 
 ```bash
 pytest -q
@@ -229,17 +198,15 @@ pytest -q
 검증 항목:
 - health endpoint
 - task CRUD
-- python/html task 수동 실행
-- runs/artifacts 목록 조회
-- artifact preview
-- 잘못된 task_id 실행 시 404
+- 수동 실행 + run/artifact 저장
+- scheduler job 등록/수정/제거
+- dashboard summary/jobs/html-results
 
 ---
 
-## 11. 다음 단계 TODO
+## 12. 다음 단계 TODO
 
-- [ ] APScheduler 실제 cron/interval 자동 실행
-- [ ] 대시보드 요약 API
-- [ ] 프론트엔드 관리자 화면
+- [ ] 관리자 프론트엔드
 - [ ] delivery channel(email/knox/webhook)
 - [ ] 권한관리 / 감사로그
+- [ ] persistent job store / distributed worker

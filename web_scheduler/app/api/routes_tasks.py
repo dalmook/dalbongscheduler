@@ -6,6 +6,7 @@ from app.schemas.common import GenericMessageResponse
 from app.schemas.run import TaskRunListItem
 from app.schemas.task import TaskCreate, TaskListItem, TaskResponse, TaskUpdate
 from app.services.execution_service import list_runs
+from app.services.exceptions import InvalidScheduleError, SchedulerRegistrationError
 from app.services.task_service import (
     TaskDuplicateNameError,
     TaskNotFoundError,
@@ -26,6 +27,10 @@ def create_task_api(payload: TaskCreate, db: Session = Depends(get_db)) -> TaskR
         return TaskResponse.model_validate(task)
     except TaskDuplicateNameError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except InvalidScheduleError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except SchedulerRegistrationError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
 
 
 @router.get("", response_model=list[TaskListItem])
@@ -65,6 +70,10 @@ def update_task_api(task_id: int, payload: TaskUpdate, db: Session = Depends(get
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except TaskDuplicateNameError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except InvalidScheduleError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except SchedulerRegistrationError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
 
 
 @router.delete("/{task_id}", response_model=GenericMessageResponse)
@@ -74,3 +83,5 @@ def delete_task_api(task_id: int, db: Session = Depends(get_db)) -> GenericMessa
         return GenericMessageResponse(message="Task deleted successfully")
     except TaskNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except SchedulerRegistrationError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc

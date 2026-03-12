@@ -22,6 +22,10 @@ class TaskDefinition(Base):
 
     is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
+    timezone: Mapped[str | None] = mapped_column(String(64), nullable=True, default="Asia/Seoul")
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    scheduler_job_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
     python_code: Mapped[str | None] = mapped_column(Text, nullable=True)
     sql_code: Mapped[str | None] = mapped_column(Text, nullable=True)
     html_template: Mapped[str | None] = mapped_column(Text, nullable=True)

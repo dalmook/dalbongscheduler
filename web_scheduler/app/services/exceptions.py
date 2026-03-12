@@ -16,3 +16,11 @@ class InvalidParamsJsonError(Exception):
 
 class UnsupportedTaskTypeError(Exception):
     pass
+
+
+class InvalidScheduleError(Exception):
+    pass
+
+
+class SchedulerRegistrationError(Exception):
+    pass
