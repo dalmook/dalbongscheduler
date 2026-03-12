@@ -80,6 +80,8 @@ npm run dev
 
 ### 백엔드 `.env.example`
 - `DATABASE_URL=sqlite:///./web_scheduler.db`
+- `SQL_RUNNER_DATABASE_URL=` (비우면 DATABASE_URL 사용)
+- `SQL_RUNNER_ALLOW_WRITE=false` (기본 write 차단)
 - `DEFAULT_TIMEZONE=Asia/Seoul`
 - `CORS_ALLOW_ORIGINS=http://localhost:5173,http://127.0.0.1:5173`
 
@@ -153,7 +155,7 @@ npm run build
 
 ## 9) 다음 작업 TODO
 
-- [ ] 실제 SQL DB 연결
+- [x] 실제 SQL DB 연결 (SQL_RUNNER_DATABASE_URL)
 - [ ] delivery channel(email/knox/webhook)
 - [ ] 권한관리 / 감사로그
 - [ ] 코드 편집기 고도화

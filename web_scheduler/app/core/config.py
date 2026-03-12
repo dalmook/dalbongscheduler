@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     app_host: str = Field(default="0.0.0.0", alias="APP_HOST")
     app_port: int = Field(default=8000, alias="APP_PORT")
     database_url: str = Field(default="sqlite:///./web_scheduler.db", alias="DATABASE_URL")
+    sql_runner_database_url: str | None = Field(default=None, alias="SQL_RUNNER_DATABASE_URL")
+    sql_runner_allow_write: bool = Field(default=False, alias="SQL_RUNNER_ALLOW_WRITE")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     default_timezone: str = Field(default="Asia/Seoul", alias="DEFAULT_TIMEZONE")
     cors_allow_origins: str = Field(default="http://localhost:5173,http://127.0.0.1:5173", alias="CORS_ALLOW_ORIGINS")

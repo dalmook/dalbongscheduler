@@ -73,3 +73,29 @@ def test_list_runs_and_task_runs(client):
 def test_run_invalid_task_id(client):
     response = client.post("/tasks/99999/run")
     assert response.status_code == 404
+
+
+def test_run_task_sql_success(client):
+    task_res = client.post(
+        "/tasks",
+        json={
+            "name": "phase4_sql_task",
+            "description": "run sql",
+            "task_type": "sql",
+            "schedule_type": "manual",
+            "sql_code": "SELECT 1 AS ok",
+            "output_format": "json",
+        },
+    )
+    assert task_res.status_code == 201
+    task = task_res.json()
+
+    run_res = client.post(f"/tasks/{task['id']}/run")
+    assert run_res.status_code == 201, run_res.text
+    assert run_res.json()["status"] == "success"
+
+    artifacts = client.get("/artifacts", params={"task_id": task["id"]})
+    assert artifacts.status_code == 200
+    items = artifacts.json()
+    assert len(items) == 1
+    assert items[0]["artifact_type"] == "json"
