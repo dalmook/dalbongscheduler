@@ -4,16 +4,9 @@
 
 현재 단계는 **5단계: 자동 스케줄 등록 + 대시보드 API + 관리자 프론트 연동** 입니다.
 
-## 1) 이번 단계 핵심 변경
+---
 
-- APScheduler가 `cron`/`interval` Task를 실제로 자동 등록/갱신/제거
-- Dashboard 전용 API 제공
-  - `GET /dashboard/summary`
-  - `GET /dashboard/jobs`
-  - `GET /dashboard/html-results`
-- Frontend Dashboard / HTML Results가 위 Dashboard API를 직접 사용
-
-## 2) 현재 구현 범위
+## 1) 지금 상태 요약
 
 ### 백엔드
 - Task CRUD API: `/tasks`
@@ -25,7 +18,7 @@
 - Dashboard API: `/dashboard/summary`, `/dashboard/jobs`, `/dashboard/html-results`
 - Health API: `/health`
 
-### 자동 실행 지원 범위
+### 자동 실행 지원
 - `manual`: 스케줄러 등록 안 함
 - `cron`: cron_expr 기반 자동 등록
 - `interval`: interval_seconds 기반 자동 등록(최소 10초)
@@ -37,17 +30,63 @@
 - Runs
 - HTML Results
 
-## 3) 폴더 구조
+---
+
+## 2) 폴더 구조
 
 ```text
 web_scheduler/
   app/                 # FastAPI backend
   tests/               # pytest tests
   frontend/            # React + Vite + TypeScript admin UI
+  docs/
+    OPERATIONS_CHECKLIST.md
   .env.example
   requirements.txt
   README.md
 ```
+
+---
+
+## 3) "uvicorn은 했는데 접속은 어떻게?" (가장 많이 묻는 케이스)
+
+### A. 백엔드만 띄운 상태
+아래 명령으로 백엔드만 실행하면:
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+접속 가능 URL은:
+- API Root/Health: `http://<서버IP>:8000/health`
+- Swagger: `http://<서버IP>:8000/docs`
+- Dashboard API(JSON):
+  - `http://<서버IP>:8000/dashboard/summary`
+  - `http://<서버IP>:8000/dashboard/jobs`
+  - `http://<서버IP>:8000/dashboard/html-results`
+
+> 즉, **웹 관리 화면(React UI)** 은 아직 안 뜹니다. (백엔드 API만 뜬 상태)
+
+### B. 웹 관리 화면까지 보려면
+프론트도 따로 실행해야 합니다.
+
+```bash
+cd frontend
+npm install
+cp .env.example .env
+npm run dev
+```
+
+그다음 접속:
+- Frontend: `http://<서버IP>:5173`
+
+`frontend/.env`의 `VITE_API_BASE_URL`이 백엔드 주소를 가리켜야 합니다.
+예:
+```env
+VITE_API_BASE_URL=http://127.0.0.1:8000
+```
+
+---
 
 ## 4) Windows CMD 기준 실행
 
@@ -59,7 +98,7 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 copy .env.example .env
-uvicorn app.main:app --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 - Backend: `http://127.0.0.1:8000`
@@ -76,11 +115,13 @@ npm run dev
 
 - Frontend: `http://127.0.0.1:5173`
 
+---
+
 ## 5) 환경변수
 
 ### 백엔드 `.env.example`
 - `DATABASE_URL=sqlite:///./web_scheduler.db`
-- `SQL_RUNNER_DATABASE_URL=` (비우면 DATABASE_URL 사용)
+- `SQL_RUNNER_DATABASE_URL=` (비우면 `DATABASE_URL` 사용)
 - `SQL_RUNNER_ALLOW_WRITE=false` (기본 write 차단)
 - `DEFAULT_TIMEZONE=Asia/Seoul`
 - `CORS_ALLOW_ORIGINS=http://localhost:5173,http://127.0.0.1:5173`
@@ -88,84 +129,102 @@ npm run dev
 ### 프론트엔드 `frontend/.env.example`
 - `VITE_API_BASE_URL=http://127.0.0.1:8000`
 
-## 6) Dashboard API 설명
+---
 
-### `GET /dashboard/summary`
-- task/run/artifact 집계 요약
-- 다음 실행 예정 task 목록
-- 최근 실패 run 목록
+## 6) API 빠른 확인 순서
 
-### `GET /dashboard/jobs`
-- 현재 스케줄러 등록 job 목록
-- `job_id`, `task_id`, `task_name`, `trigger`, `next_run_time`, `is_enabled`
-
-### `GET /dashboard/html-results`
-- html task별 최신 결과 요약
-- 최신 artifact id, preview_text, 최근 성공/실패 시각
-
-## 7) CMD 기준 curl 예시
-
-### 7-1. cron task 생성
-
-```cmd
-curl -X POST "http://127.0.0.1:8000/tasks" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"name\":\"daily_html_report\",\"task_type\":\"html\",\"schedule_type\":\"cron\",\"cron_expr\":\"0 9 * * *\",\"html_template\":\"<h1>{{ title }}</h1>\",\"params_json\":\"{\\\"title\\\":\\\"Daily Report\\\"}\",\"is_enabled\":true}"
+### 6-1. 헬스체크
+```bash
+curl http://127.0.0.1:8000/health
 ```
 
-### 7-2. interval task 생성
-
-```cmd
-curl -X POST "http://127.0.0.1:8000/tasks" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"name\":\"interval_python_job\",\"task_type\":\"python\",\"schedule_type\":\"interval\",\"interval_seconds\":30,\"python_code\":\"print('hello')\",\"is_enabled\":true}"
+### 6-2. 기본 Task 템플릿 자동 생성
+```bash
+curl -X POST http://127.0.0.1:8000/tasks/bootstrap-defaults
 ```
 
-### 7-3. 수동 실행
-
-```cmd
-curl -X POST "http://127.0.0.1:8000/tasks/1/run"
+### 6-3. Task 목록 조회
+```bash
+curl http://127.0.0.1:8000/tasks
 ```
 
-### 7-4. dashboard 조회
-
-```cmd
-curl "http://127.0.0.1:8000/dashboard/summary"
-curl "http://127.0.0.1:8000/dashboard/jobs"
-curl "http://127.0.0.1:8000/dashboard/html-results"
+### 6-4. Task 수동 실행
+```bash
+curl -X POST http://127.0.0.1:8000/tasks/1/run
 ```
 
-## 8) 운영 체크리스트
+### 6-5. Dashboard 조회
+```bash
+curl http://127.0.0.1:8000/dashboard/summary
+curl http://127.0.0.1:8000/dashboard/jobs
+curl http://127.0.0.1:8000/dashboard/html-results
+```
 
-- `docs/OPERATIONS_CHECKLIST.md` 참고
-- API 응답 헤더 `x-request-id`로 요청 단위 추적 가능
+---
+
+## 7) SQL Runner 사용법
+
+SQL task 생성 시 `task_type=sql`, `sql_code`를 넣으면 실행됩니다.
+
+- 읽기 쿼리(`SELECT`)는 기본 허용
+- 쓰기 쿼리(`INSERT/UPDATE/DELETE/...`)는 기본 차단
+- 쓰기 허용하려면:
+
+```env
+SQL_RUNNER_ALLOW_WRITE=true
+```
+
+실제 별도 DB를 붙이려면:
+
+```env
+SQL_RUNNER_DATABASE_URL=postgresql+psycopg://user:pass@host:5432/dbname
+```
+
+---
+
+## 8) 관측성/운영 포인트
+
+- API 응답 헤더 `x-request-id` 제공 (요청 추적)
+- 주요 라우트 로그에 request_id 포함
+- 운영 절차는 `docs/OPERATIONS_CHECKLIST.md` 참고
+
+---
 
 ## 9) 점검 명령
 
-```cmd
-:: backend
+```bash
+# backend
 python -m compileall app tests
-set PYTHONPATH=.
-pytest -q
+PYTHONPATH=. pytest -q
 
-:: frontend
+# frontend
 cd frontend
 npm run build
 ```
 
-## 9) 다음 작업 TODO
+---
 
-- [x] 실제 SQL DB 연결 (SQL_RUNNER_DATABASE_URL)
+## 10) 현재 TODO
+
+- [x] 실제 SQL DB 연결 (`SQL_RUNNER_DATABASE_URL`)
 - [ ] delivery channel(email/knox/webhook)
 - [ ] 권한관리 / 감사로그
 - [ ] 코드 편집기 고도화
 
 ---
 
-### (참고) Linux/macOS 최소 실행
+## (참고) Linux/macOS 최소 실행
 
 ```bash
+cd web_scheduler
 python -m venv .venv
 source .venv/bin/activate
+pip install -r requirements.txt
 cp .env.example .env
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+cd frontend
+npm install
+cp .env.example .env
+npm run dev
 ```
