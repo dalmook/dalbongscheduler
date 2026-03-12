@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     default_timezone: str = Field(default="Asia/Seoul", alias="DEFAULT_TIMEZONE")
     cors_allow_origins: str = Field(default="http://localhost:5173,http://127.0.0.1:5173", alias="CORS_ALLOW_ORIGINS")
+    uploads_dir: str = Field(default="./uploads", alias="UPLOADS_DIR")
 
     model_config = SettingsConfigDict(
         env_file=".env",

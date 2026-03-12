@@ -15,14 +15,14 @@ function TaskTable({ rows, onRun, onEdit, onDelete }: Props) {
       <thead>
         <tr>
           <th>ID</th>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Schedule</th>
-          <th>Enabled</th>
-          <th>Timezone</th>
-          <th>Next Run</th>
-          <th>Last Run</th>
-          <th>Actions</th>
+          <th>이름</th>
+          <th>유형</th>
+          <th>스케줄</th>
+          <th>사용</th>
+          <th>시간대</th>
+          <th>다음 실행</th>
+          <th>최근 실행</th>
+          <th>작업</th>
         </tr>
       </thead>
       <tbody>
@@ -40,10 +40,10 @@ function TaskTable({ rows, onRun, onEdit, onDelete }: Props) {
               <div className="muted">{task.last_run_at ?? "-"}</div>
             </td>
             <td className="row">
-              <Link className="btn" to={`/tasks/${task.id}`}>Detail</Link>
-              <button className="btn" onClick={() => onRun(task)}>Run</button>
-              <button className="btn" onClick={() => onEdit(task)}>Edit</button>
-              <button className="btn danger" onClick={() => onDelete(task)}>Delete</button>
+              <Link className="btn" to={`/tasks/${task.id}`}>상세</Link>
+              <button className="btn" onClick={() => onRun(task)}>실행</button>
+              <button className="btn" onClick={() => onEdit(task)}>수정</button>
+              <button className="btn danger" onClick={() => onDelete(task)}>삭제</button>
             </td>
           </tr>
         ))}

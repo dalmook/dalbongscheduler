@@ -15,6 +15,7 @@
 - 실행 이력 API: `/runs`, `/runs/{run_id}`, `/tasks/{task_id}/runs`
 - 결과물 API: `/artifacts`, `/artifacts/{artifact_id}`, `/tasks/{task_id}/artifacts`
 - HTML Preview API: `/artifacts/{artifact_id}/preview`
+- 파일 업로드 API: `POST /files/upload`, `GET /files`
 - Dashboard API: `/dashboard/summary`, `/dashboard/jobs`, `/dashboard/html-results`
 - Health API: `/health`
 
@@ -25,7 +26,7 @@
 
 ### 프론트엔드
 - Dashboard
-- Tasks
+- Tasks (한글 UI, 비개발자용 스케줄 입력: 수동/매일/매주/매월/간격)
 - Task Detail
 - Runs
 - HTML Results
