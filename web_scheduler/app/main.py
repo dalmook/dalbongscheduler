@@ -2,7 +2,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.routes_artifacts import router as artifacts_router
 from app.api.routes_health import router as health_router
+from app.api.routes_runs import router as runs_router
 from app.api.routes_tasks import router as task_router
 from app.core.config import get_settings
 from app.core.logging import get_logger, setup_logging
@@ -37,3 +39,5 @@ app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 app.include_router(health_router)
 app.include_router(task_router)
+app.include_router(runs_router)
+app.include_router(artifacts_router)

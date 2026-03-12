@@ -2,6 +2,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.db.models import TaskDefinition
+from app.db.session import SessionLocal
 
 logger = get_logger(__name__)
 _settings = get_settings()
@@ -11,10 +13,10 @@ _scheduler = BackgroundScheduler(timezone=_settings.default_timezone)
 def init_scheduler() -> None:
     """Initialize scheduler resources.
 
-    TODO: Add job stores/executors for production scaling.
+    TODO(phase3): configure persistent job stores and executors.
     """
 
-    logger.info("Scheduler initialized (skeleton mode)")
+    logger.info("Scheduler initialized")
 
 
 def start_scheduler() -> None:
@@ -30,9 +32,25 @@ def shutdown_scheduler() -> None:
 
 
 def sync_enabled_tasks() -> None:
-    """Placeholder for syncing DB task definitions to APScheduler jobs.
+    """Read currently enabled tasks and log sync candidates.
 
-    TODO: In phase 2, map enabled task definitions to scheduler jobs.
+    TODO(phase3): register/update cron/interval jobs into APScheduler.
     """
 
-    logger.info("sync_enabled_tasks called (TODO placeholder)")
+    with SessionLocal() as db:
+        enabled_tasks = (
+            db.query(TaskDefinition)
+            .filter(TaskDefinition.is_enabled.is_(True))
+            .order_by(TaskDefinition.id.asc())
+            .all()
+        )
+
+    for task in enabled_tasks:
+        logger.info(
+            "Scheduler sync candidate: task_id=%s name=%s schedule_type=%s",
+            task.id,
+            task.name,
+            task.schedule_type,
+        )
+
+    logger.info("Scheduler sync completed: enabled_task_count=%s", len(enabled_tasks))

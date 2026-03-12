@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.schemas.run import TaskRunListItem
+
 TASK_TYPES = {"python", "sql", "html"}
 SCHEDULE_TYPES = {"manual", "cron", "interval"}
 
@@ -32,13 +34,6 @@ class TaskBase(BaseModel):
             raise ValueError("cron_expr is required when schedule_type is 'cron'")
         if self.schedule_type == "interval" and not self.interval_seconds:
             raise ValueError("interval_seconds is required when schedule_type is 'interval'")
-
-        if self.task_type == "python" and self.python_code is None:
-            pass
-        if self.task_type == "sql" and self.sql_code is None:
-            pass
-        if self.task_type == "html" and self.html_template is None:
-            pass
 
         return self
 
@@ -107,5 +102,6 @@ class TaskResponse(BaseModel):
     last_run_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    recent_runs: list[TaskRunListItem] | None = None
 
     model_config = {"from_attributes": True}
