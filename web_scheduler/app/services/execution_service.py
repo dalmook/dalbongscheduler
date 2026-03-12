@@ -20,6 +20,17 @@ from app.services.task_service import TaskNotFoundError, get_task
 logger = get_logger(__name__)
 
 
+def _as_utc(dt: datetime) -> datetime:
+    """Normalize DB datetime values for safe subtraction on SQLite.
+
+    SQLite often returns naive datetimes even when timezone-aware columns are used.
+    """
+
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def create_run_record(db: Session, task_id: int, trigger_type: str = "manual") -> TaskRun:
     run = TaskRun(task_id=task_id, trigger_type=trigger_type, status="queued")
     db.add(run)
@@ -40,7 +51,7 @@ def mark_run_success(db: Session, run: TaskRun, result_summary: str | None = Non
     run.finished_at = finished_at
     run.result_summary = result_summary
     if run.started_at:
-        run.duration_ms = int((finished_at - run.started_at).total_seconds() * 1000)
+        run.duration_ms = int((finished_at - _as_utc(run.started_at)).total_seconds() * 1000)
     db.flush()
     return run
 
@@ -51,7 +62,7 @@ def mark_run_failed(db: Session, run: TaskRun, error_message: str) -> TaskRun:
     run.error_message = error_message
     run.finished_at = finished_at
     if run.started_at:
-        run.duration_ms = int((finished_at - run.started_at).total_seconds() * 1000)
+        run.duration_ms = int((finished_at - _as_utc(run.started_at)).total_seconds() * 1000)
     db.flush()
     return run
 

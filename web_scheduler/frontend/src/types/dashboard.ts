@@ -1,3 +1,18 @@
+export interface DashboardNextScheduledRun {
+  task_id: number;
+  task_name: string;
+  schedule_type: string;
+  next_run_at?: string | null;
+}
+
+export interface DashboardRecentFailedRun {
+  run_id: number;
+  task_id: number;
+  task_name: string;
+  error_message?: string | null;
+  finished_at?: string | null;
+}
+
 export interface DashboardSummary {
   total_tasks: number;
   enabled_tasks: number;
@@ -7,19 +22,8 @@ export interface DashboardSummary {
   success_runs_24h: number;
   failed_runs_24h: number;
   html_artifacts_24h: number;
-  next_scheduled_runs: Array<{
-    task_id: number;
-    task_name: string;
-    schedule_type: string;
-    next_run_at?: string | null;
-  }>;
-  recent_failed_runs: Array<{
-    run_id: number;
-    task_id: number;
-    task_name: string;
-    error_message?: string | null;
-    finished_at?: string | null;
-  }>;
+  next_scheduled_runs: DashboardNextScheduledRun[];
+  recent_failed_runs: DashboardRecentFailedRun[];
 }
 
 export interface DashboardJob {

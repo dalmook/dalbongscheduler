@@ -1,14 +1,14 @@
-import { apiRequest } from "./client";
 import type { DashboardHtmlResult, DashboardJob, DashboardSummary } from "../types/dashboard";
+import { request } from "./client";
 
-export async function fetchDashboardSummary(): Promise<DashboardSummary> {
-  return apiRequest<DashboardSummary>("/dashboard/summary");
+export function getDashboardSummary() {
+  return request<DashboardSummary>("/dashboard/summary");
 }
 
-export async function fetchDashboardJobs(): Promise<DashboardJob[]> {
-  return apiRequest<DashboardJob[]>("/dashboard/jobs");
+export function getDashboardJobs() {
+  return request<DashboardJob[]>("/dashboard/jobs");
 }
 
-export async function fetchDashboardHtmlResults(): Promise<DashboardHtmlResult[]> {
-  return apiRequest<DashboardHtmlResult[]>("/dashboard/html-results");
+export function getDashboardHtmlResults() {
+  return request<DashboardHtmlResult[]>("/dashboard/html-results");
 }

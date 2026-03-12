@@ -19,6 +19,8 @@ function TaskTable({ rows, onRun, onEdit, onDelete }: Props) {
           <th>Type</th>
           <th>Schedule</th>
           <th>Enabled</th>
+          <th>Timezone</th>
+          <th>Next Run</th>
           <th>Last Run</th>
           <th>Actions</th>
         </tr>
@@ -31,6 +33,8 @@ function TaskTable({ rows, onRun, onEdit, onDelete }: Props) {
             <td>{task.task_type}</td>
             <td>{task.schedule_type}</td>
             <td><StatusBadge value={task.is_enabled} /></td>
+            <td>{task.timezone ?? "-"}</td>
+            <td>{task.next_run_at ?? "-"}</td>
             <td>
               <StatusBadge value={task.last_run_status} />
               <div className="muted">{task.last_run_at ?? "-"}</div>

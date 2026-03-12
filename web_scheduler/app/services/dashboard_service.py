@@ -159,6 +159,7 @@ def get_dashboard_html_results(db: Session) -> list[DashboardHtmlResultItem]:
                 )
             )
 
+        items.sort(key=lambda item: item.latest_generated_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
         return items
     except Exception:
         logger.exception("Dashboard html-results aggregation failed")

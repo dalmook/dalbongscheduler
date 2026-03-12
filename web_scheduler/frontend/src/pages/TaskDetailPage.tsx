@@ -62,6 +62,8 @@ function TaskDetailPage() {
         <p><b>name:</b> {task.name}</p>
         <p><b>type:</b> {task.task_type}</p>
         <p><b>schedule:</b> {task.schedule_type}</p>
+        <p><b>timezone:</b> {task.timezone ?? "-"}</p>
+        <p><b>next_run_at:</b> {task.next_run_at ?? "-"}</p>
         <button className="btn primary" onClick={execute}>Run Now</button>
       </div>
 
