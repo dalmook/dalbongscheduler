@@ -133,7 +133,12 @@ curl "http://127.0.0.1:8000/dashboard/jobs"
 curl "http://127.0.0.1:8000/dashboard/html-results"
 ```
 
-## 8) 점검 명령
+## 8) 운영 체크리스트
+
+- `docs/OPERATIONS_CHECKLIST.md` 참고
+- API 응답 헤더 `x-request-id`로 요청 단위 추적 가능
+
+## 9) 점검 명령
 
 ```cmd
 :: backend

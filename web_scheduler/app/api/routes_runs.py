@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
+from app.core.logging import get_logger
 from app.db.session import get_db
 from app.schemas.run import TaskRunListItem, TaskRunResponse, TaskRunStartResponse
 from app.services.execution_service import get_run, list_runs, run_task
@@ -13,10 +14,12 @@ from app.services.exceptions import (
 from app.services.task_service import TaskNotFoundError
 
 router = APIRouter(tags=["runs"])
+logger = get_logger(__name__)
 
 
 @router.post("/tasks/{task_id}/run", response_model=TaskRunStartResponse, status_code=status.HTTP_201_CREATED)
-def run_task_api(task_id: int, db: Session = Depends(get_db)) -> TaskRunStartResponse:
+def run_task_api(task_id: int, request: Request, db: Session = Depends(get_db)) -> TaskRunStartResponse:
+    logger.info("request_id=%s run_task task_id=%s", getattr(request.state, "request_id", "-"), task_id)
     try:
         run = run_task(db, task_id=task_id, trigger_type="manual")
         return TaskRunStartResponse(
