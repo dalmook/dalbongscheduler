@@ -34,10 +34,12 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
         description: initial.description ?? "",
         cron_expr: initial.cron_expr ?? "",
         interval_seconds: initial.interval_seconds ?? undefined,
+        timezone: initial.timezone ?? "Asia/Seoul",
         python_code: initial.python_code ?? "",
         sql_code: initial.sql_code ?? "",
         html_template: initial.html_template ?? "",
         params_json: initial.params_json ?? "",
+        output_format: initial.output_format ?? "json",
       });
     } else {
       setForm(DEFAULT_PAYLOAD);

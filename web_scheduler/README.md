@@ -17,6 +17,7 @@
 
 ### 백엔드
 - Task CRUD API: `/tasks`
+- Task preset API: `GET /tasks/presets`, `POST /tasks/bootstrap-defaults`
 - 수동 실행 API: `POST /tasks/{task_id}/run`
 - 실행 이력 API: `/runs`, `/runs/{run_id}`, `/tasks/{task_id}/runs`
 - 결과물 API: `/artifacts`, `/artifacts/{artifact_id}`, `/tasks/{task_id}/artifacts`

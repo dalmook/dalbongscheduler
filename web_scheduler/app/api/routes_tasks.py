@@ -10,10 +10,12 @@ from app.services.exceptions import InvalidScheduleError, SchedulerRegistrationE
 from app.services.task_service import (
     TaskDuplicateNameError,
     TaskNotFoundError,
+    create_default_tasks,
     create_task,
     delete_task,
     get_task,
     list_tasks,
+    task_presets,
     update_task,
 )
 
@@ -30,6 +32,19 @@ def create_task_api(payload: TaskCreate, db: Session = Depends(get_db)) -> TaskR
     except InvalidScheduleError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except SchedulerRegistrationError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+
+
+@router.get("/presets")
+def list_task_presets_api() -> list[dict]:
+    return [preset.model_dump() for preset in task_presets()]
+
+
+@router.post("/bootstrap-defaults")
+def bootstrap_default_tasks_api(db: Session = Depends(get_db)) -> dict:
+    try:
+        return create_default_tasks(db)
+    except (InvalidScheduleError, SchedulerRegistrationError) as exc:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
 
 

@@ -52,3 +52,27 @@ def test_delete_task(client):
 
     get_response = client.get(f"/tasks/{task['id']}")
     assert get_response.status_code == 404
+
+
+def test_task_presets_and_bootstrap_defaults(client):
+    presets = client.get("/tasks/presets")
+    assert presets.status_code == 200
+    rows = presets.json()
+    assert len(rows) >= 3
+    names = {row["name"] for row in rows}
+    assert "sample_html_daily_report" in names
+    assert "sample_python_heartbeat" in names
+    assert "sample_sql_health" in names
+
+    boot = client.post("/tasks/bootstrap-defaults")
+    assert boot.status_code == 200
+    body = boot.json()
+    assert "created" in body
+    assert "skipped" in body
+
+    listed = client.get("/tasks")
+    assert listed.status_code == 200
+    listed_names = {row["name"] for row in listed.json()}
+    assert "sample_html_daily_report" in listed_names
+    assert "sample_python_heartbeat" in listed_names
+    assert "sample_sql_health" in listed_names

@@ -130,3 +130,59 @@ def delete_task(db: Session, task_id: int) -> None:
     db.delete(task)
     db.commit()
     logger.info("Task deleted: id=%s, name=%s", task.id, task.name)
+
+
+def task_presets() -> list[TaskCreate]:
+    return [
+        TaskCreate(
+            name="sample_html_daily_report",
+            description="Daily html report sample",
+            task_type="html",
+            schedule_type="cron",
+            cron_expr="0 9 * * *",
+            is_enabled=True,
+            timezone=settings.default_timezone,
+            html_template="<h1>{{ title }}</h1><p>{{ date }}</p>",
+            params_json='{"title":"Daily Report","date":"{{ now }}"}',
+            output_format="html",
+        ),
+        TaskCreate(
+            name="sample_python_heartbeat",
+            description="Python heartbeat sample",
+            task_type="python",
+            schedule_type="interval",
+            interval_seconds=300,
+            is_enabled=False,
+            timezone=settings.default_timezone,
+            python_code="print('heartbeat ok')",
+            params_json="{}",
+            output_format="text",
+        ),
+        TaskCreate(
+            name="sample_sql_health",
+            description="SQL placeholder sample",
+            task_type="sql",
+            schedule_type="manual",
+            is_enabled=False,
+            timezone=settings.default_timezone,
+            sql_code="SELECT 1 AS ok",
+            params_json="{}",
+            output_format="json",
+        ),
+    ]
+
+
+def create_default_tasks(db: Session) -> dict[str, list[str]]:
+    created: list[str] = []
+    skipped: list[str] = []
+
+    existing_names = {name for (name,) in db.execute(select(TaskDefinition.name)).all()}
+    for preset in task_presets():
+        if preset.name in existing_names:
+            skipped.append(preset.name)
+            continue
+        create_task(db, preset)
+        created.append(preset.name)
+        existing_names.add(preset.name)
+
+    return {"created": created, "skipped": skipped}
