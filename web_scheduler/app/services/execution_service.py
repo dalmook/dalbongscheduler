@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -15,6 +16,7 @@ from app.services.exceptions import (
     TaskRunNotFoundError,
     UnsupportedTaskTypeError,
 )
+from app.services.notification_service import send_mail_html
 from app.services.task_service import TaskNotFoundError, get_task
 
 logger = get_logger(__name__)
@@ -78,6 +80,39 @@ def _execute_by_task_type(task: TaskDefinition) -> dict[str, str | None]:
     raise UnsupportedTaskTypeError(f"Unsupported task type: {task.task_type}")
 
 
+def _runtime_vars() -> dict[str, str]:
+    now = datetime.now()
+    return {
+        "now": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "today": now.strftime("%Y-%m-%d"),
+        "ymd": now.strftime("%Y%m%d"),
+        "md": f"{now.month}/{now.day}",
+    }
+
+
+def _render_text_template(text: str, vars_map: dict[str, str]) -> str:
+    out = text or ""
+    for k, v in vars_map.items():
+        out = out.replace("{" + str(k) + "}", str(v))
+    return out
+
+
+def _extract_mail_options(task: TaskDefinition) -> tuple[bool, str | None, str | None]:
+    if not task.params_json:
+        return False, None, None
+    try:
+        params = json.loads(task.params_json)
+    except Exception:
+        return False, None, None
+    if not isinstance(params, dict):
+        return False, None, None
+
+    send = bool(params.get("mail_send", False))
+    subject_tpl = params.get("mail_subject") if isinstance(params.get("mail_subject"), str) else None
+    recipients_csv = params.get("mail_recipients") if isinstance(params.get("mail_recipients"), str) else None
+    return send, subject_tpl, recipients_csv
+
+
 def run_task(db: Session, task_id: int, trigger_type: str = "manual") -> TaskRun:
     try:
         task = get_task(db, task_id)
@@ -106,6 +141,16 @@ def run_task(db: Session, task_id: int, trigger_type: str = "manual") -> TaskRun
         mark_run_success(db, run, result.get("summary"))
         task.last_run_status = "success"
         task.last_run_at = datetime.now(timezone.utc)
+
+        # optional mail delivery (legacy scheduler-like behavior)
+        mail_send, subject_tpl, recipients_csv = _extract_mail_options(task)
+        if mail_send:
+            rv = _runtime_vars()
+            default_subject = f"[{rv['md']}] {task.name}"
+            subject = _render_text_template(subject_tpl or default_subject, rv)
+            html_body = result.get("content_html") or f"<html><body><pre>{result.get('content_text') or result.get('summary') or ''}</pre></body></html>"
+            send_mail_html(subject=subject, html_body=html_body, recipients_csv=recipients_csv)
+
         db.commit()
         db.refresh(run)
         logger.info("Task run success: task_id=%s run_id=%s", task.id, run.id)

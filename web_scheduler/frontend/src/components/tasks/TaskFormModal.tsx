@@ -33,6 +33,10 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
   const [weeklyDay, setWeeklyDay] = useState("mon");
   const [monthlyDay, setMonthlyDay] = useState(1);
 
+  const [mailSend, setMailSend] = useState(false);
+  const [mailSubject, setMailSubject] = useState("");
+  const [mailRecipients, setMailRecipients] = useState("");
+
   useEffect(() => {
     if (initial) {
       const next: TaskCreatePayload = {
@@ -49,6 +53,18 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
         output_format: initial.output_format ?? "json",
       };
       setForm(next);
+
+      // mail options from params_json
+      try {
+        const p = next.params_json ? JSON.parse(next.params_json) : {};
+        setMailSend(Boolean(p.mail_send));
+        setMailSubject(typeof p.mail_subject === "string" ? p.mail_subject : "");
+        setMailRecipients(typeof p.mail_recipients === "string" ? p.mail_recipients : "");
+      } catch {
+        setMailSend(false);
+        setMailSubject("");
+        setMailRecipients("");
+      }
 
       if (next.schedule_type === "interval") {
         setScheduleUi("interval");
@@ -80,6 +96,9 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
       setTimeHHMM("09:00");
       setWeeklyDay("mon");
       setMonthlyDay(1);
+      setMailSend(false);
+      setMailSubject("");
+      setMailRecipients("");
     }
     setError("");
   }, [initial, open]);
@@ -126,6 +145,19 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
       payload.cron_expr = toCron(timeHHMM, scheduleUi);
       payload.interval_seconds = undefined;
     }
+
+    // merge advanced params + mail options
+    let baseParams: Record<string, unknown> = {};
+    try {
+      baseParams = payload.params_json?.trim() ? JSON.parse(payload.params_json) : {};
+      if (typeof baseParams !== "object" || Array.isArray(baseParams)) baseParams = {};
+    } catch {
+      baseParams = {};
+    }
+    baseParams.mail_send = mailSend;
+    baseParams.mail_subject = mailSubject;
+    baseParams.mail_recipients = mailRecipients;
+    payload.params_json = JSON.stringify(baseParams, null, 2);
 
     const msg = validate(payload);
     if (msg) {
@@ -203,9 +235,19 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
           </label>
         </div>
 
+        <div className="card" style={{ margin: "8px 0" }}>
+          <h4>메일 전송 옵션</h4>
+          <label className="check">
+            <input type="checkbox" checked={mailSend} onChange={(e) => setMailSend(e.target.checked)} />
+            실행 성공 시 메일 전송
+          </label>
+          <input className="input" placeholder="메일 제목 템플릿 (예: [{md}] 출하 현황)" value={mailSubject} onChange={(e) => setMailSubject(e.target.value)} />
+          <input className="input" placeholder="수신자 (예: sungmook.cho, user2)" value={mailRecipients} onChange={(e) => setMailRecipients(e.target.value)} />
+        </div>
+
         <textarea
           className="textarea"
-          placeholder='params_json (예: {"input_paths":["/path/a.xlsx"]})'
+          placeholder='추가 params_json (예: {"input_paths":["/path/a.xlsx"]})'
           value={form.params_json ?? ""}
           onChange={(e) => setForm({ ...form, params_json: e.target.value })}
         />

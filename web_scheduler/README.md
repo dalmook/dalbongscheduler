@@ -125,6 +125,12 @@ npm run dev
 - `DATABASE_URL=sqlite:///./web_scheduler.db`
 - `SQL_RUNNER_DATABASE_URL=` (비우면 `DATABASE_URL` 사용)
 - `SQL_RUNNER_ALLOW_WRITE=false` (기본 write 차단)
+- `UPLOADS_DIR=./uploads`
+- `MAIL_ENABLED=false`
+- `MAIL_API_URL=`
+- `MAIL_SYSTEM_ID=`
+- `MAIL_TOKEN=`
+- `MAIL_SENDER_ID=`
 - `DEFAULT_TIMEZONE=Asia/Seoul`
 - `CORS_ALLOW_ORIGINS=http://localhost:5173,http://127.0.0.1:5173`
 
@@ -165,6 +171,10 @@ curl http://127.0.0.1:8000/dashboard/html-results
 ---
 
 ## 7) SQL Runner 사용법
+
+- SQL task 실행 후 Task 상세 > 결과물에서 `엑셀` 버튼으로 다운로드 가능합니다.
+- 메일 제목 템플릿은 `{md}`(예: 3/13), `{today}`, `{ymd}` 치환을 지원합니다.
+- 수신자 입력은 `sungmook.cho, user2` 형식으로 넣으면 도메인 없는 경우 `@samsung.com` 자동 보정됩니다.
 
 SQL task 생성 시 `task_type=sql`, `sql_code`를 넣으면 실행됩니다.
 

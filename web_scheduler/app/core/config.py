@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     cors_allow_origins: str = Field(default="http://localhost:5173,http://127.0.0.1:5173", alias="CORS_ALLOW_ORIGINS")
     uploads_dir: str = Field(default="./uploads", alias="UPLOADS_DIR")
 
+    mail_enabled: bool = Field(default=False, alias="MAIL_ENABLED")
+    mail_api_url: str | None = Field(default=None, alias="MAIL_API_URL")
+    mail_system_id: str | None = Field(default=None, alias="MAIL_SYSTEM_ID")
+    mail_token: str | None = Field(default=None, alias="MAIL_TOKEN")
+    mail_sender_id: str | None = Field(default=None, alias="MAIL_SENDER_ID")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

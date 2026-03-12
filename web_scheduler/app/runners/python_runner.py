@@ -38,15 +38,34 @@ def run_python_task(python_code: str | None, params_json: str | None) -> dict[st
     result_obj = locals_ctx.get("result")
     printed_text = output_buffer.getvalue().strip()
 
+    html_candidate = None
+    for key in ("result_html", "RESULT_HTML", "__RESULT_HTML__", "html"):
+        val = locals_ctx.get(key)
+        if isinstance(val, str) and val.strip():
+            html_candidate = val
+            break
+
     if isinstance(result_obj, dict):
         summary = str(result_obj.get("summary", "Python task executed"))
         artifact_type = str(result_obj.get("artifact_type", "text"))
+        content_html = result_obj.get("content_html") or html_candidate
+        if content_html and artifact_type == "text":
+            artifact_type = "html"
         return {
             "summary": summary,
             "artifact_type": artifact_type,
             "content_text": result_obj.get("content_text") or printed_text,
             "content_json": json.dumps(result_obj, ensure_ascii=False),
-            "content_html": result_obj.get("content_html"),
+            "content_html": content_html,
+        }
+
+    if html_candidate:
+        return {
+            "summary": "Python task executed",
+            "artifact_type": "html",
+            "content_text": printed_text or "",
+            "content_json": json.dumps({"params": params}, ensure_ascii=False),
+            "content_html": html_candidate,
         }
 
     return {
