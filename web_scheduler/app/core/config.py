@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     database_url: str = Field(default="sqlite:///./web_scheduler.db", alias="DATABASE_URL")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     default_timezone: str = Field(default="Asia/Seoul", alias="DEFAULT_TIMEZONE")
+    cors_allow_origins: str = Field(default="http://localhost:5173,http://127.0.0.1:5173", alias="CORS_ALLOW_ORIGINS")
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -21,6 +22,10 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
     )
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [item.strip() for item in self.cors_allow_origins.split(",") if item.strip()]
 
 
 @lru_cache

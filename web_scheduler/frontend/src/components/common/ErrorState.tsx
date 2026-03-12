@@ -1,0 +1,5 @@
+function ErrorState({ message }: { message: string }) {
+  return <div className="state-box error">Error: {message}</div>;
+}
+
+export default ErrorState;

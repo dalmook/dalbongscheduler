@@ -89,6 +89,8 @@ class TaskListItem(BaseModel):
     is_enabled: bool
     timezone: str | None
     next_run_at: datetime | None
+    last_run_status: str | None
+    last_run_at: datetime | None
     created_at: datetime
     updated_at: datetime
 

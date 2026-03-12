@@ -1,79 +1,40 @@
 # web_scheduler
 
-`dalbongscheduler`의 tkinter 코드와 분리된 웹 백엔드 프로젝트입니다.  
-현재는 **3단계(APScheduler 자동 실행 + 대시보드 API)** 기준으로 구현되어 있습니다.
+`dalbongscheduler`에서 분리된 웹 기반 스케줄러 관리 프로젝트입니다.  
+현재는 **4단계(백엔드 + 관리자 프론트엔드)** 기준으로 구현되어 있습니다.
 
-## 1. 3단계 목표
+## 1) 현재 구현 범위
 
-- 기존 수동 실행(2단계)을 유지하면서 자동 실행(cron/interval)을 실제 동작 상태로 확장
-- TaskDefinition 수정/삭제 시 scheduler 상태가 즉시 반영되도록 동기화
-- 운영 관리를 위한 대시보드 API 제공
-  - 전체 요약
-  - 현재 등록 job 목록
-  - HTML 결과 요약
+### 백엔드 (FastAPI)
+- Task CRUD (`/tasks`)
+- 수동 실행 (`POST /tasks/{id}/run`)
+- 실행 이력/결과물 조회 (`/runs`, `/artifacts`)
+- APScheduler 자동 실행 (`cron`, `interval`) + startup sync
+- 대시보드 API (`/dashboard/summary`, `/dashboard/jobs`, `/dashboard/html-results`)
 
----
-
-## 2. 현재 지원 범위
-
-### 스케줄 타입
-- `manual`: APScheduler 등록 안 함, 수동 실행만 가능
-- `cron`: APScheduler에 cron trigger로 등록
-- `interval`: APScheduler에 interval trigger로 등록
-
-### 자동 실행 등록 규칙
-- `is_enabled=true` + `schedule_type in (cron, interval)` → 등록
-- `is_enabled=false` 또는 `schedule_type=manual` → 제거
-- task 수정 시 스케줄 변경 자동 반영
-- task 삭제 시 scheduler job 제거
+### 프론트엔드 (React + Vite + TS)
+- Dashboard / Tasks / Runs / HTML Results 화면
+- Task 생성/수정/삭제/수동실행
+- 실행이력 조회 및 상세 확인
+- HTML 결과 preview
+- 검색/필터, 로딩/에러/빈 상태 UI
 
 ---
 
-## 3. 폴더 구조
+## 2) 폴더 구조
 
 ```text
 web_scheduler/
-  app/
-    api/
-      routes_health.py
-      routes_tasks.py
-      routes_runs.py
-      routes_artifacts.py
-      routes_dashboard.py
-    core/
-      config.py
-      logging.py
-    db/
-      base.py
-      session.py
-      models.py
-      init_db.py
-    runners/
-      python_runner.py
-      sql_runner.py
-      html_runner.py
-    schemas/
-      common.py
-      task.py
-      run.py
-      artifact.py
-      dashboard.py
-    services/
-      task_service.py
-      execution_service.py
-      artifact_service.py
-      scheduler_service.py
-      dashboard_service.py
-      exceptions.py
-    utils/
-      time_utils.py
-    main.py
-  tests/
-    conftest.py
-    test_health.py
-    test_tasks.py
-    test_runs_and_artifacts.py
-    test_scheduler_dashboard.py
+  app/                      # FastAPI backend
+  tests/                    # pytest
+  frontend/                 # React admin UI
+    src/
+      app/router.tsx
+      api/
+      types/
+      pages/
+      components/
+      styles/global.css
   .env.example
   requirements.txt
   README.md
@@ -81,39 +42,7 @@ web_scheduler/
 
 ---
 
-## 4. 주요 데이터 모델
-
-### TaskDefinition
-핵심 필드:
-- `schedule_type`, `cron_expr`, `interval_seconds`, `is_enabled`
-- `timezone` (기본 Asia/Seoul)
-- `next_run_at`
-- `scheduler_job_id`
-- `last_run_status`, `last_run_at`
-
-### TaskRun
-- 수동/자동 실행 이력 저장 (`trigger_type=manual|scheduled`)
-- 상태(`queued/running/success/failed`)와 실행 시간 정보 저장
-
-### TaskArtifact
-- 실행 결과물 버전 관리
-- 신규 artifact 저장 시 기존 latest 해제 + version 증가
-
----
-
-## 5. Scheduler 동작 구조
-
-1. 앱 시작 시 `init_scheduler()` → `start_scheduler()` → `sync_enabled_tasks()`
-2. DB의 task를 읽어 등록/제거 동기화
-3. job id는 `task:{task_id}` 형식
-4. 스케줄 트리거 시 내부적으로 `run_task(..., trigger_type="scheduled")` 호출
-5. 실행 성공/실패와 관계없이 scheduler thread는 계속 동작 (예외는 로그 처리)
-
-> 현재 구조는 단일 프로세스 기준입니다.
-
----
-
-## 6. 설치 및 실행
+## 3) 백엔드 실행
 
 ```bash
 cd web_scheduler
@@ -124,89 +53,112 @@ cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
-- Swagger: http://127.0.0.1:8000/docs
-- Health: http://127.0.0.1:8000/health
+- Backend: `http://127.0.0.1:8000`
+- Swagger: `http://127.0.0.1:8000/docs`
 
----
+### CORS
+로컬 프론트 개발을 위해 기본 허용:
+- `http://localhost:5173`
+- `http://127.0.0.1:5173`
 
-## 7. API 요약
-
-### 기본/작업
-- `GET /health`
-- `POST /tasks`
-- `GET /tasks`
-- `GET /tasks/{task_id}` (`include_recent_runs=true` 지원)
-- `PUT /tasks/{task_id}`
-- `DELETE /tasks/{task_id}`
-
-### 실행/결과
-- `POST /tasks/{task_id}/run`
-- `GET /runs`
-- `GET /runs/{run_id}`
-- `GET /tasks/{task_id}/runs`
-- `GET /artifacts`
-- `GET /artifacts/{artifact_id}`
-- `GET /tasks/{task_id}/artifacts`
-- `GET /artifacts/{artifact_id}/preview`
-
-### 대시보드
-- `GET /dashboard/summary`
-- `GET /dashboard/jobs`
-- `GET /dashboard/html-results`
-
----
-
-## 8. Cron/Interval 예시
-
-### Cron 예시 3개
-- `0 9 * * *` : 매일 09:00
-- `*/15 * * * *` : 15분마다
-- `30 8 * * 1-5` : 평일 08:30
-
-### Interval 예시 2개
-- `30` : 30초마다
-- `300` : 5분마다
-
-> interval 최소값은 10초로 제한합니다.
-
----
-
-## 9. task 생성 후 자동 등록 흐름
-
-1. `POST /tasks` 호출
-2. `schedule_type`이 `cron/interval`이고 `is_enabled=true`이면
-3. task 저장 직후 scheduler에 즉시 등록
-4. `TaskDefinition.next_run_at`, `scheduler_job_id` 갱신
-5. `/dashboard/jobs`에서 즉시 확인 가능
-
----
-
-## 10. 주의사항
-
-- 현재 scheduler는 **단일 프로세스** 기준입니다.
-- 멀티 인스턴스/분산 실행(리더 선출, 중복 실행 방지)은 아직 미구현입니다.
-- SQL runner는 현재 외부 DB 연결 없는 **mock 실행기**입니다.
-
----
-
-## 11. 테스트
-
-```bash
-pytest -q
+`.env`에서 변경 가능:
+```env
+CORS_ALLOW_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
-검증 항목:
-- health endpoint
-- task CRUD
-- 수동 실행 + run/artifact 저장
-- scheduler job 등록/수정/제거
-- dashboard summary/jobs/html-results
+---
+
+## 4) 프론트엔드 실행
+
+```bash
+cd web_scheduler/frontend
+npm install
+cp .env.example .env
+npm run dev
+```
+
+프론트 기본 주소:
+- `http://localhost:5173`
+
+### frontend 환경변수
+`frontend/.env.example`:
+```env
+VITE_API_BASE_URL=http://127.0.0.1:8000
+```
 
 ---
 
-## 12. 다음 단계 TODO
+## 5) 운영자 화면 설명
 
-- [ ] 관리자 프론트엔드
+### Dashboard
+- 요약 카드 (total/enabled/scheduled/success/failed/html)
+- scheduler jobs 테이블
+- recent failed runs
+- 최신 HTML 결과 카드 + preview
+
+### Tasks
+- 검색/필터(name/task_type/is_enabled)
+- 테이블(상태/스케줄/next_run)
+- 새 작업 등록/수정 모달
+- 수동 실행/삭제/상세이동
+
+### Task Detail
+- 작업 정보 + 코드 보기
+- task 기준 실행 이력
+- task 기준 artifact 목록
+- HTML artifact preview
+
+### Runs
+- task_id/status/trigger 필터
+- 실행 이력 테이블
+- run 상세(result_summary, error_message)
+
+### HTML Results
+- html task별 최신 결과 목록
+- 최신 artifact preview
+- 버전 목록(해당 task artifacts)
+
+---
+
+## 6) 스케줄 예시
+
+### cron 예시
+- `0 9 * * *`
+- `*/15 * * * *`
+- `30 8 * * 1-5`
+
+### interval 예시
+- `30`
+- `300`
+
+> interval 최소값은 10초입니다.
+
+---
+
+## 7) 주의사항
+
+- 현재는 **단일 프로세스** 기준 scheduler 동작입니다.
+- 멀티 인스턴스/분산 실행은 아직 고려하지 않았습니다.
+- SQL runner는 아직 mock 실행입니다.
+
+---
+
+## 8) 기본 검증
+
+```bash
+# backend
+python -m compileall app tests
+pytest -q
+
+# frontend
+npm run build
+```
+
+---
+
+## 9) 다음 단계 TODO
+
 - [ ] delivery channel(email/knox/webhook)
 - [ ] 권한관리 / 감사로그
-- [ ] persistent job store / distributed worker
+- [ ] 코드 에디터 고도화
+- [ ] 배포(Docker/Nginx)
