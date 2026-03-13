@@ -8,6 +8,11 @@ interface Props {
   onSubmit: (payload: TaskCreatePayload) => Promise<void>;
 }
 
+type ScheduleUI = "manual" | "daily" | "weekly" | "monthly" | "interval" | "custom";
+
+type PythonBlock = { title: string; code: string };
+type SqlBlock = { title: string; sql: string };
+
 const DEFAULT_PAYLOAD: TaskCreatePayload = {
   name: "",
   description: "",
@@ -22,8 +27,6 @@ const DEFAULT_PAYLOAD: TaskCreatePayload = {
   output_format: "json",
 };
 
-type ScheduleUI = "manual" | "daily" | "weekly" | "monthly" | "interval" | "custom";
-
 function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
   const [form, setForm] = useState<TaskCreatePayload>(DEFAULT_PAYLOAD);
   const [error, setError] = useState("");
@@ -36,6 +39,9 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
   const [mailSend, setMailSend] = useState(false);
   const [mailSubject, setMailSubject] = useState("");
   const [mailRecipients, setMailRecipients] = useState("");
+
+  const [pythonBlocks, setPythonBlocks] = useState<PythonBlock[]>([]);
+  const [sqlBlocks, setSqlBlocks] = useState<SqlBlock[]>([]);
 
   useEffect(() => {
     if (initial) {
@@ -54,16 +60,31 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
       };
       setForm(next);
 
-      // mail options from params_json
       try {
         const p = next.params_json ? JSON.parse(next.params_json) : {};
         setMailSend(Boolean(p.mail_send));
         setMailSubject(typeof p.mail_subject === "string" ? p.mail_subject : "");
         setMailRecipients(typeof p.mail_recipients === "string" ? p.mail_recipients : "");
+        setPythonBlocks(
+          Array.isArray(p.python_blocks)
+            ? p.python_blocks
+                .filter((x: any) => x && typeof x === "object")
+                .map((x: any) => ({ title: String(x.title ?? ""), code: String(x.code ?? "") }))
+            : [],
+        );
+        setSqlBlocks(
+          Array.isArray(p.sql_attachment_blocks)
+            ? p.sql_attachment_blocks
+                .filter((x: any) => x && typeof x === "object")
+                .map((x: any) => ({ title: String(x.title ?? ""), sql: String(x.sql ?? "") }))
+            : [],
+        );
       } catch {
         setMailSend(false);
         setMailSubject("");
         setMailRecipients("");
+        setPythonBlocks([]);
+        setSqlBlocks([]);
       }
 
       if (next.schedule_type === "interval") {
@@ -85,7 +106,6 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
           setMonthlyDay(Number(mo[3]));
           setTimeHHMM(`${String(Number(mo[2])).padStart(2, "0")}:${String(Number(mo[1])).padStart(2, "0")}`);
         } else {
-          // 기존 cron 표현이 단순 daily/weekly/monthly로 변환 불가하면 custom으로 유지
           setScheduleUi("custom");
         }
       } else {
@@ -100,6 +120,8 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
       setMailSend(false);
       setMailSubject("");
       setMailRecipients("");
+      setPythonBlocks([]);
+      setSqlBlocks([]);
     }
     setError("");
   }, [initial, open]);
@@ -143,7 +165,6 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
       payload.interval_seconds = payload.interval_seconds ?? 300;
     } else if (scheduleUi === "custom") {
       payload.schedule_type = "cron";
-      payload.cron_expr = payload.cron_expr ?? "";
       payload.interval_seconds = undefined;
     } else {
       payload.schedule_type = "cron";
@@ -151,7 +172,6 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
       payload.interval_seconds = undefined;
     }
 
-    // merge advanced params + mail options
     let baseParams: Record<string, unknown> = {};
     try {
       baseParams = payload.params_json?.trim() ? JSON.parse(payload.params_json) : {};
@@ -159,9 +179,18 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
     } catch {
       baseParams = {};
     }
+
     baseParams.mail_send = mailSend;
     baseParams.mail_subject = mailSubject;
     baseParams.mail_recipients = mailRecipients;
+
+    const pyb = pythonBlocks.filter((b) => b.code.trim());
+    const sqlb = sqlBlocks.filter((b) => b.sql.trim());
+    if (pyb.length) baseParams.python_blocks = pyb;
+    else delete (baseParams as any).python_blocks;
+    if (sqlb.length) baseParams.sql_attachment_blocks = sqlb;
+    else delete (baseParams as any).sql_attachment_blocks;
+
     payload.params_json = JSON.stringify(baseParams, null, 2);
 
     const msg = validate(payload);
@@ -214,15 +243,7 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
           )}
 
           {scheduleUi === "monthly" && (
-            <input
-              className="input"
-              placeholder="매월 일자(1~31)"
-              type="number"
-              min={1}
-              max={31}
-              value={monthlyDay}
-              onChange={(e) => setMonthlyDay(Number(e.target.value || 1))}
-            />
+            <input className="input" type="number" min={1} max={31} value={monthlyDay} onChange={(e) => setMonthlyDay(Number(e.target.value || 1))} />
           )}
 
           {scheduleUi === "interval" && (
@@ -230,7 +251,7 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
           )}
 
           {scheduleUi === "custom" && (
-            <input className="input" placeholder="CRON 표현식 (예: 20 17 * * 1,3,5)" value={form.cron_expr ?? ""} onChange={(e) => setForm({ ...form, cron_expr: e.target.value })} />
+            <input className="input" placeholder="CRON 표현식" value={form.cron_expr ?? ""} onChange={(e) => setForm({ ...form, cron_expr: e.target.value })} />
           )}
 
           <select className="input" value={form.output_format ?? "json"} onChange={(e) => setForm({ ...form, output_format: e.target.value })}>
@@ -248,25 +269,102 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
         <div className="card" style={{ margin: "8px 0" }}>
           <h4>메일 전송 옵션</h4>
           <label className="check">
-            <input type="checkbox" checked={mailSend} onChange={(e) => setMailSend(e.target.checked)} />
-            실행 성공 시 메일 전송
+            <input type="checkbox" checked={mailSend} onChange={(e) => setMailSend(e.target.checked)} /> 실행 성공 시 메일 전송
           </label>
           <input className="input" placeholder="메일 제목 템플릿 (예: [{md}] 출하 현황)" value={mailSubject} onChange={(e) => setMailSubject(e.target.value)} />
           <input className="input" placeholder="수신자 (예: sungmook.cho, user2)" value={mailRecipients} onChange={(e) => setMailRecipients(e.target.value)} />
         </div>
 
+        {form.task_type === "python" && <textarea className="textarea code" placeholder="메인 파이썬 코드" value={form.python_code ?? ""} onChange={(e) => setForm({ ...form, python_code: e.target.value })} />}
+        {(form.task_type === "python" || form.task_type === "sql") && (
+          <textarea className="textarea code" placeholder={form.task_type === "python" ? "첨부 엑셀용 SQL (단일)" : "SQL 문"} value={form.sql_code ?? ""} onChange={(e) => setForm({ ...form, sql_code: e.target.value })} />
+        )}
+        {form.task_type === "html" && <textarea className="textarea code" placeholder="HTML 템플릿" value={form.html_template ?? ""} onChange={(e) => setForm({ ...form, html_template: e.target.value })} />}
+
+        {form.task_type === "python" && (
+          <div className="card" style={{ margin: "8px 0" }}>
+            <div className="row between">
+              <h4>파이썬 블록(본문 섹션)</h4>
+              <button
+                className="btn"
+                onClick={() => setPythonBlocks([...pythonBlocks, { title: `블록${pythonBlocks.length + 1}`, code: "" }])}
+              >
+                + 블록 추가
+              </button>
+            </div>
+            {pythonBlocks.map((b, i) => (
+              <div key={i} className="card" style={{ marginBottom: 8 }}>
+                <input
+                  className="input"
+                  placeholder="블록 제목"
+                  value={b.title}
+                  onChange={(e) => {
+                    const next = [...pythonBlocks];
+                    next[i] = { ...next[i], title: e.target.value };
+                    setPythonBlocks(next);
+                  }}
+                />
+                <textarea
+                  className="textarea code"
+                  placeholder="블록 파이썬 코드"
+                  value={b.code}
+                  onChange={(e) => {
+                    const next = [...pythonBlocks];
+                    next[i] = { ...next[i], code: e.target.value };
+                    setPythonBlocks(next);
+                  }}
+                />
+                <button className="btn danger" onClick={() => setPythonBlocks(pythonBlocks.filter((_, idx) => idx !== i))}>삭제</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {(form.task_type === "python" || form.task_type === "sql") && (
+          <div className="card" style={{ margin: "8px 0" }}>
+            <div className="row between">
+              <h4>SQL 첨부 블록(엑셀)</h4>
+              <button
+                className="btn"
+                onClick={() => setSqlBlocks([...sqlBlocks, { title: `첨부${sqlBlocks.length + 1}`, sql: "" }])}
+              >
+                + 첨부 블록 추가
+              </button>
+            </div>
+            {sqlBlocks.map((b, i) => (
+              <div key={i} className="card" style={{ marginBottom: 8 }}>
+                <input
+                  className="input"
+                  placeholder="첨부 제목"
+                  value={b.title}
+                  onChange={(e) => {
+                    const next = [...sqlBlocks];
+                    next[i] = { ...next[i], title: e.target.value };
+                    setSqlBlocks(next);
+                  }}
+                />
+                <textarea
+                  className="textarea code"
+                  placeholder="첨부용 SQL"
+                  value={b.sql}
+                  onChange={(e) => {
+                    const next = [...sqlBlocks];
+                    next[i] = { ...next[i], sql: e.target.value };
+                    setSqlBlocks(next);
+                  }}
+                />
+                <button className="btn danger" onClick={() => setSqlBlocks(sqlBlocks.filter((_, idx) => idx !== i))}>삭제</button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <textarea
           className="textarea"
-          placeholder='추가 params_json (예: {"input_paths":["/path/a.xlsx"],"python_blocks":[{"title":"블록1","code":"RESULT_HTML=\"<h3>ok</h3>\""}],"sql_attachment_blocks":[{"title":"첨부1","sql":"SELECT 1 AS ok"}]})'
+          placeholder='고급 params_json (예: {"sql_dsn":"...","sql_user":"...","sql_pw":"..."})'
           value={form.params_json ?? ""}
           onChange={(e) => setForm({ ...form, params_json: e.target.value })}
         />
-
-        {form.task_type === "python" && <textarea className="textarea code" placeholder="파이썬 코드" value={form.python_code ?? ""} onChange={(e) => setForm({ ...form, python_code: e.target.value })} />}
-        {(form.task_type === "python" || form.task_type === "sql") && (
-          <textarea className="textarea code" placeholder={form.task_type === "python" ? "첨부 엑셀용 SQL (선택)" : "SQL 문"} value={form.sql_code ?? ""} onChange={(e) => setForm({ ...form, sql_code: e.target.value })} />
-        )}
-        {form.task_type === "html" && <textarea className="textarea code" placeholder="HTML 템플릿" value={form.html_template ?? ""} onChange={(e) => setForm({ ...form, html_template: e.target.value })} />}
 
         <div className="row right">
           <button className="btn" onClick={onClose}>닫기</button>
