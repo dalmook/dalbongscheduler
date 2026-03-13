@@ -71,10 +71,50 @@ def mark_run_failed(db: Session, run: TaskRun, error_message: str) -> TaskRun:
     return run
 
 
+def _run_python_blocks_if_any(task: TaskDefinition) -> dict[str, str | None] | None:
+    if task.task_type != "python" or not task.params_json:
+        return None
+    try:
+        params = json.loads(task.params_json)
+    except Exception:
+        return None
+    blocks = params.get("python_blocks") if isinstance(params, dict) else None
+    if not isinstance(blocks, list) or not blocks:
+        return None
+
+    sections: list[str] = []
+    for i, b in enumerate(blocks, start=1):
+        if not isinstance(b, dict):
+            continue
+        title = str(b.get("title") or f"python_block_{i}")
+        code = str(b.get("code") or "").strip()
+        if not code:
+            continue
+        out = run_python_task(code, task.params_json)
+        html = out.get("content_html") or f"<pre>{out.get('content_text') or out.get('summary') or ''}</pre>"
+        sections.append(f"<section><h2>{title}</h2>{html}</section>")
+
+    if not sections:
+        return None
+
+    combined_html = "<html><body>" + "<hr/>".join(sections) + "</body></html>"
+    return {
+        "summary": f"Python block mode executed ({len(sections)} sections)",
+        "artifact_type": "html",
+        "content_text": None,
+        "content_json": json.dumps({"mode": "python_blocks", "count": len(sections)}, ensure_ascii=False),
+        "content_html": combined_html,
+    }
+
+
 def _execute_by_task_type(task: TaskDefinition) -> dict[str, str | None]:
     block_mode_result = _run_block_mode_if_any(task)
     if block_mode_result is not None:
         return block_mode_result
+
+    py_block_result = _run_python_blocks_if_any(task)
+    if py_block_result is not None:
+        return py_block_result
 
     if task.task_type == "python":
         return run_python_task(task.python_code, task.params_json)
@@ -120,34 +160,55 @@ def _extract_mail_options(task: TaskDefinition) -> tuple[bool, str | None, str |
 
 
 def _build_sql_excel_attachment_if_any(task: TaskDefinition) -> list[str]:
-    """For python/html tasks, allow extra sql_code to generate excel attachment.
+    """Build one or more excel attachments from SQL definitions.
 
-    Legacy gocscheduler behavior alignment: HTML body from python, SQL as attachment.
+    Sources:
+    - task.sql_code (single sql)
+    - params_json.sql_attachment_blocks: [{title, sql}]
     """
-    if not task.sql_code or not task.sql_code.strip():
-        return []
-
     from app.core.config import get_settings
 
     settings = get_settings()
     db_url = settings.sql_runner_database_url or settings.database_url
-    sql = _replace_tokens(task.sql_code, _runtime_vars())
+    rv = _runtime_vars()
 
-    try:
-        df = _query_to_dataframe(sql, db_url)
-    except Exception as exc:
-        logger.warning("sql attachment query failed: %s", exc)
+    sql_jobs: list[tuple[str, str]] = []
+
+    if task.sql_code and task.sql_code.strip():
+        sql_jobs.append(("sql_attachment", _replace_tokens(task.sql_code, rv)))
+
+    if task.params_json:
+        try:
+            params = json.loads(task.params_json)
+            blocks = params.get("sql_attachment_blocks") if isinstance(params, dict) else None
+            if isinstance(blocks, list):
+                for i, b in enumerate(blocks, start=1):
+                    if not isinstance(b, dict):
+                        continue
+                    title = str(b.get("title") or f"sql_block_{i}")
+                    sql_raw = str(b.get("sql") or "").strip()
+                    if sql_raw:
+                        sql_jobs.append((title, _replace_tokens(sql_raw, rv)))
+        except Exception:
+            pass
+
+    if not sql_jobs:
         return []
 
-    try:
-        tmp = tempfile.NamedTemporaryFile(prefix=f"task_{task.id}_", suffix=".xlsx", delete=False)
-        tmp_path = tmp.name
-        tmp.close()
-        df.to_excel(tmp_path, index=False)
-        return [tmp_path]
-    except Exception as exc:
-        logger.warning("sql attachment excel build failed: %s", exc)
-        return []
+    attachments: list[str] = []
+    for title, sql in sql_jobs:
+        try:
+            df = _query_to_dataframe(sql, db_url)
+            tmp = tempfile.NamedTemporaryFile(prefix=f"task_{task.id}_{title}_", suffix=".xlsx", delete=False)
+            tmp_path = tmp.name
+            tmp.close()
+            df.to_excel(tmp_path, index=False)
+            attachments.append(tmp_path)
+            logger.info("sql attachment built: task_id=%s title=%s rows=%s", task.id, title, len(df))
+        except Exception as exc:
+            logger.warning("sql attachment query/build failed: task_id=%s title=%s err=%s", task.id, title, exc)
+
+    return attachments
 
 
 def _replace_tokens(text_value: str | None, vars_map: dict[str, str]) -> str:

@@ -257,7 +257,7 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
 
         <textarea
           className="textarea"
-          placeholder='추가 params_json (예: {"input_paths":["/path/a.xlsx"]})'
+          placeholder='추가 params_json (예: {"input_paths":["/path/a.xlsx"],"python_blocks":[{"title":"블록1","code":"RESULT_HTML=\"<h3>ok</h3>\""}],"sql_attachment_blocks":[{"title":"첨부1","sql":"SELECT 1 AS ok"}]})'
           value={form.params_json ?? ""}
           onChange={(e) => setForm({ ...form, params_json: e.target.value })}
         />
