@@ -22,7 +22,7 @@ const DEFAULT_PAYLOAD: TaskCreatePayload = {
   output_format: "json",
 };
 
-type ScheduleUI = "manual" | "daily" | "weekly" | "monthly" | "interval";
+type ScheduleUI = "manual" | "daily" | "weekly" | "monthly" | "interval" | "custom";
 
 function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
   const [form, setForm] = useState<TaskCreatePayload>(DEFAULT_PAYLOAD);
@@ -85,7 +85,8 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
           setMonthlyDay(Number(mo[3]));
           setTimeHHMM(`${String(Number(mo[2])).padStart(2, "0")}:${String(Number(mo[1])).padStart(2, "0")}`);
         } else {
-          setScheduleUi("manual");
+          // 기존 cron 표현이 단순 daily/weekly/monthly로 변환 불가하면 custom으로 유지
+          setScheduleUi("custom");
         }
       } else {
         setScheduleUi("manual");
@@ -140,6 +141,10 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
       payload.schedule_type = "interval";
       payload.cron_expr = undefined;
       payload.interval_seconds = payload.interval_seconds ?? 300;
+    } else if (scheduleUi === "custom") {
+      payload.schedule_type = "cron";
+      payload.cron_expr = payload.cron_expr ?? "";
+      payload.interval_seconds = undefined;
     } else {
       payload.schedule_type = "cron";
       payload.cron_expr = toCron(timeHHMM, scheduleUi);
@@ -189,6 +194,7 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
             <option value="weekly">매주</option>
             <option value="monthly">매월</option>
             <option value="interval">간격(초)</option>
+            <option value="custom">사용자 지정(CRON)</option>
           </select>
 
           {(scheduleUi === "daily" || scheduleUi === "weekly" || scheduleUi === "monthly") && (
@@ -221,6 +227,10 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
 
           {scheduleUi === "interval" && (
             <input className="input" placeholder="간격(초)" type="number" value={form.interval_seconds ?? ""} onChange={(e) => setForm({ ...form, interval_seconds: Number(e.target.value) })} />
+          )}
+
+          {scheduleUi === "custom" && (
+            <input className="input" placeholder="CRON 표현식 (예: 20 17 * * 1,3,5)" value={form.cron_expr ?? ""} onChange={(e) => setForm({ ...form, cron_expr: e.target.value })} />
           )}
 
           <select className="input" value={form.output_format ?? "json"} onChange={(e) => setForm({ ...form, output_format: e.target.value })}>
