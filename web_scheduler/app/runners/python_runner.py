@@ -45,6 +45,12 @@ def run_python_task(python_code: str | None, params_json: str | None) -> dict[st
             html_candidate = val
             break
 
+    # fallback: stdout로 HTML을 print한 경우도 HTML 결과로 인식
+    if not html_candidate and printed_text:
+        t = printed_text.lower()
+        if any(tag in t for tag in ("<html", "<table", "<div", "<body", "</")):
+            html_candidate = printed_text
+
     if isinstance(result_obj, dict):
         summary = str(result_obj.get("summary", "Python task executed"))
         artifact_type = str(result_obj.get("artifact_type", "text"))
