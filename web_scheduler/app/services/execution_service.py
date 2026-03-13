@@ -2,6 +2,7 @@ import json
 import tempfile
 from datetime import datetime, timezone
 
+import oracledb
 import pandas as pd
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session
@@ -172,10 +173,23 @@ def _build_sql_excel_attachment_if_any(task: TaskDefinition) -> list[str]:
     db_url = settings.sql_runner_database_url or settings.database_url
     rv = _runtime_vars()
 
-    sql_jobs: list[tuple[str, str]] = []
+    sql_jobs: list[tuple[str, str, dict]] = []
+    global_conninfo = {"dsn": None, "user": None, "pw": None}
+
+    if task.params_json:
+        try:
+            p = json.loads(task.params_json)
+            if isinstance(p, dict):
+                global_conninfo = {
+                    "dsn": p.get("dsn") or p.get("sql_dsn"),
+                    "user": p.get("user") or p.get("sql_user"),
+                    "pw": p.get("pw") or p.get("sql_pw") or p.get("password"),
+                }
+        except Exception:
+            pass
 
     if task.sql_code and task.sql_code.strip():
-        sql_jobs.append(("sql_attachment", _replace_tokens(task.sql_code, rv)))
+        sql_jobs.append(("sql_attachment", _replace_tokens(task.sql_code, rv), dict(global_conninfo)))
 
     if task.params_json:
         try:
@@ -188,7 +202,12 @@ def _build_sql_excel_attachment_if_any(task: TaskDefinition) -> list[str]:
                     title = str(b.get("title") or f"sql_block_{i}")
                     sql_raw = str(b.get("sql") or "").strip()
                     if sql_raw:
-                        sql_jobs.append((title, _replace_tokens(sql_raw, rv)))
+                        conninfo = {
+                            "dsn": b.get("dsn") or global_conninfo.get("dsn"),
+                            "user": b.get("user") or global_conninfo.get("user"),
+                            "pw": b.get("pw") or b.get("password") or global_conninfo.get("pw"),
+                        }
+                        sql_jobs.append((title, _replace_tokens(sql_raw, rv), conninfo))
         except Exception:
             pass
 
@@ -196,9 +215,9 @@ def _build_sql_excel_attachment_if_any(task: TaskDefinition) -> list[str]:
         return []
 
     attachments: list[str] = []
-    for title, sql in sql_jobs:
+    for title, sql, conninfo in sql_jobs:
         try:
-            df = _query_to_dataframe(sql, db_url)
+            df = _query_to_dataframe(sql, db_url, conninfo=conninfo)
             tmp = tempfile.NamedTemporaryFile(prefix=f"task_{task.id}_{title}_", suffix=".xlsx", delete=False)
             tmp_path = tmp.name
             tmp.close()
@@ -218,7 +237,16 @@ def _replace_tokens(text_value: str | None, vars_map: dict[str, str]) -> str:
     return out
 
 
-def _query_to_dataframe(sql_text: str, db_url: str) -> pd.DataFrame:
+def _query_to_dataframe(sql_text: str, db_url: str, conninfo: dict | None = None) -> pd.DataFrame:
+    # legacy gocscheduler.py 호환: dsn/user/pw 직접 입력 우선
+    ci = conninfo or {}
+    dsn = ci.get("dsn")
+    user = ci.get("user")
+    pw = ci.get("pw")
+    if dsn and user and pw:
+        with oracledb.connect(user=str(user), password=str(pw), dsn=str(dsn)) as conn:
+            return pd.read_sql(sql_text, conn)
+
     engine = create_engine(db_url, future=True)
     with engine.connect() as conn:
         return pd.read_sql(text(sql_text), conn)
@@ -250,6 +278,12 @@ def _run_block_mode_if_any(task: TaskDefinition) -> dict[str, str | None] | None
     db_url = settings.sql_runner_database_url or settings.database_url
     gvars = _runtime_vars()
 
+    global_conninfo = {
+        "dsn": params.get("dsn") or params.get("sql_dsn"),
+        "user": params.get("user") or params.get("sql_user"),
+        "pw": params.get("pw") or params.get("sql_pw") or params.get("password"),
+    }
+
     sections: list[str] = []
     block_rows: list[dict] = []
 
@@ -266,7 +300,12 @@ def _run_block_mode_if_any(task: TaskDefinition) -> dict[str, str | None] | None
             continue
 
         try:
-            df = _query_to_dataframe(sql, db_url)
+            conninfo = {
+                "dsn": raw.get("dsn") or global_conninfo.get("dsn"),
+                "user": raw.get("user") or global_conninfo.get("user"),
+                "pw": raw.get("pw") or raw.get("password") or global_conninfo.get("pw"),
+            }
+            df = _query_to_dataframe(sql, db_url, conninfo=conninfo)
             block_rows.append({"title": title, "rows": len(df)})
             html_table = _render_df_table_html(df)
 
