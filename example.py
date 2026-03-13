@@ -388,7 +388,20 @@ ORDER BY
     # html = html_result+ """<hr style="border: none; border-top: 1px solid #ddd; margin: 10px 0;">"""+html    
     return {'html': html}
 
-if __name__=='__main__':
-    out=main({})
-    with open('output.html','w',encoding='utf-8') as f: f.write(out['html'])
+# web_scheduler 실행 호환 포맷
+# - runner는 result(dict) 또는 RESULT_HTML/html 전역변수를 인식함
+# - 아래처럼 result를 채우면 메일/미리보기에서 HTML 결과가 정상 노출됨
+
+out = main({})
+RESULT_HTML = out.get('html', '')
+result = {
+    "summary": "출하 현황 HTML 생성 완료",
+    "artifact_type": "html",
+    "content_html": RESULT_HTML,
+    "content_text": "HTML result generated",
+}
+
+if __name__ == '__main__':
+    with open('output.html', 'w', encoding='utf-8') as f:
+        f.write(RESULT_HTML)
     print('saved: output.html')
