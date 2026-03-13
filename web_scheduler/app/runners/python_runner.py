@@ -19,28 +19,28 @@ def run_python_task(python_code: str | None, params_json: str | None) -> dict[st
     except json.JSONDecodeError as exc:
         raise InvalidParamsJsonError("Invalid params_json") from exc
 
-    locals_ctx: dict[str, object] = {
+    # 중요: exec에서 globals/locals를 분리하면
+    # import로 로드된 모듈이 함수 글로벌 스코프에서 보이지 않아 NameError가 날 수 있음.
+    # 따라서 동일 네임스페이스(dict)로 실행.
+    exec_ctx: dict[str, object] = {
+        "__builtins__": __builtins__,
         "params": params,
         "result": None,
     }
     output_buffer = io.StringIO()
 
-    globals_ctx = {
-        "__builtins__": __builtins__,
-    }
-
     try:
         with contextlib.redirect_stdout(output_buffer):
-            exec(python_code, globals_ctx, locals_ctx)
+            exec(python_code, exec_ctx, exec_ctx)
     except Exception as exc:
         raise TaskExecutionError(f"Python execution failed: {exc}") from exc
 
-    result_obj = locals_ctx.get("result")
+    result_obj = exec_ctx.get("result")
     printed_text = output_buffer.getvalue().strip()
 
     html_candidate = None
     for key in ("result_html", "RESULT_HTML", "__RESULT_HTML__", "html"):
-        val = locals_ctx.get(key)
+        val = exec_ctx.get(key)
         if isinstance(val, str) and val.strip():
             html_candidate = val
             break
