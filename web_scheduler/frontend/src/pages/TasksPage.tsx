@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createTask, listTasks, removeTask, runTask, updateTask } from "../api/tasks";
+import { createTask, getTask, listTasks, removeTask, runTask, updateTask } from "../api/tasks";
 import type { Task, TaskCreatePayload } from "../types/task";
 import TaskTable from "../components/tasks/TaskTable";
 import TaskFormModal from "../components/tasks/TaskFormModal";
@@ -124,9 +124,14 @@ function TasksPage() {
         <TaskTable
           rows={rows}
           onRun={handleRun}
-          onEdit={(t) => {
-            setEditing(t);
-            setModalOpen(true);
+          onEdit={async (t) => {
+            try {
+              const full = await getTask(t.id);
+              setEditing(full);
+              setModalOpen(true);
+            } catch (e) {
+              setError((e as Error).message);
+            }
           }}
           onDelete={askDelete}
         />
