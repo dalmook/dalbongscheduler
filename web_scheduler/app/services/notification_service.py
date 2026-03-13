@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import quote
+
 import requests
 
 from app.core.config import get_settings
@@ -19,6 +21,20 @@ def _normalize_recipients(csv_text: str | None) -> list[str]:
         out.append(t)
     # unique
     return sorted(set(out))
+
+
+def _build_mail_send_url(base_url: str, sender_id: str) -> str:
+    base = (base_url or "").strip().rstrip("/")
+    if not base:
+        return ""
+    # gocscheduler.py 호환: HOST만 주면 고정 path를 자동 구성
+    if "/mail/api/v2.0/mails/send" not in base:
+        return f"{base}/mail/api/v2.0/mails/send?userId={quote(sender_id)}"
+    # 이미 path가 포함된 경우 userId가 없으면 보강
+    if "userId=" not in base:
+        sep = "&" if "?" in base else "?"
+        return f"{base}{sep}userId={quote(sender_id)}"
+    return base
 
 
 def send_mail_html(subject: str, html_body: str, recipients_csv: str | None) -> None:
@@ -52,10 +68,15 @@ def send_mail_html(subject: str, html_body: str, recipients_csv: str | None) -> 
         "Content-Type": "application/json",
     }
 
+    send_url = _build_mail_send_url(settings.mail_api_url or "", settings.mail_sender_id)
+    if not send_url:
+        logger.warning("mail send url invalid")
+        return
+
     try:
-        r = requests.post(settings.mail_api_url, json=payload, headers=headers, timeout=20)
+        r = requests.post(send_url, json=payload, headers=headers, timeout=20)
         if not (200 <= r.status_code < 300):
-            logger.warning("mail send failed status=%s body=%s", r.status_code, r.text[:500])
+            logger.warning("mail send failed status=%s url=%s body=%s", r.status_code, send_url, r.text[:500])
         else:
             logger.info("mail sent. subject=%s recipients=%s", subject, len(recipients))
     except Exception as exc:

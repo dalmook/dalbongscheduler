@@ -127,7 +127,7 @@ npm run dev
 - `SQL_RUNNER_ALLOW_WRITE=false` (기본 write 차단)
 - `UPLOADS_DIR=./uploads`
 - `MAIL_ENABLED=false`
-- `MAIL_API_URL=`
+- `MAIL_API_URL=` (예: `https://openapi.samsung.net/` 또는 전체 경로; HOST만 넣으면 `/mail/api/v2.0/mails/send?userId=...` 자동 보강)
 - `MAIL_SYSTEM_ID=`
 - `MAIL_TOKEN=`
 - `MAIL_SENDER_ID=`
