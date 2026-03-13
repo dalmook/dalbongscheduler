@@ -1,4 +1,5 @@
 import json
+import tempfile
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -116,6 +117,37 @@ def _extract_mail_options(task: TaskDefinition) -> tuple[bool, str | None, str |
     subject_tpl = params.get("mail_subject") if isinstance(params.get("mail_subject"), str) else None
     recipients_csv = params.get("mail_recipients") if isinstance(params.get("mail_recipients"), str) else None
     return send, subject_tpl, recipients_csv
+
+
+def _build_sql_excel_attachment_if_any(task: TaskDefinition) -> list[str]:
+    """For python/html tasks, allow extra sql_code to generate excel attachment.
+
+    Legacy gocscheduler behavior alignment: HTML body from python, SQL as attachment.
+    """
+    if not task.sql_code or not task.sql_code.strip():
+        return []
+
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    db_url = settings.sql_runner_database_url or settings.database_url
+    sql = _replace_tokens(task.sql_code, _runtime_vars())
+
+    try:
+        df = _query_to_dataframe(sql, db_url)
+    except Exception as exc:
+        logger.warning("sql attachment query failed: %s", exc)
+        return []
+
+    try:
+        tmp = tempfile.NamedTemporaryFile(prefix=f"task_{task.id}_", suffix=".xlsx", delete=False)
+        tmp_path = tmp.name
+        tmp.close()
+        df.to_excel(tmp_path, index=False)
+        return [tmp_path]
+    except Exception as exc:
+        logger.warning("sql attachment excel build failed: %s", exc)
+        return []
 
 
 def _replace_tokens(text_value: str | None, vars_map: dict[str, str]) -> str:
@@ -245,7 +277,21 @@ def run_task(db: Session, task_id: int, trigger_type: str = "manual") -> TaskRun
             default_subject = f"[{rv['md']}] {task.name}"
             subject = _render_text_template(subject_tpl or default_subject, rv)
             html_body = result.get("content_html") or f"<html><body><pre>{result.get('content_text') or result.get('summary') or ''}</pre></body></html>"
-            send_mail_html(subject=subject, html_body=html_body, recipients_csv=recipients_csv)
+
+            attachments: list[str] = []
+            if task.task_type in {"python", "html"}:
+                attachments = _build_sql_excel_attachment_if_any(task)
+
+            try:
+                send_mail_html(subject=subject, html_body=html_body, recipients_csv=recipients_csv, attachments=attachments)
+            finally:
+                for p in attachments:
+                    try:
+                        import os
+                        if p and os.path.exists(p):
+                            os.remove(p)
+                    except Exception:
+                        pass
 
         db.commit()
         db.refresh(run)

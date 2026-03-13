@@ -263,7 +263,9 @@ function TaskFormModal({ open, initial, onClose, onSubmit }: Props) {
         />
 
         {form.task_type === "python" && <textarea className="textarea code" placeholder="파이썬 코드" value={form.python_code ?? ""} onChange={(e) => setForm({ ...form, python_code: e.target.value })} />}
-        {form.task_type === "sql" && <textarea className="textarea code" placeholder="SQL 문" value={form.sql_code ?? ""} onChange={(e) => setForm({ ...form, sql_code: e.target.value })} />}
+        {(form.task_type === "python" || form.task_type === "sql") && (
+          <textarea className="textarea code" placeholder={form.task_type === "python" ? "첨부 엑셀용 SQL (선택)" : "SQL 문"} value={form.sql_code ?? ""} onChange={(e) => setForm({ ...form, sql_code: e.target.value })} />
+        )}
         {form.task_type === "html" && <textarea className="textarea code" placeholder="HTML 템플릿" value={form.html_template ?? ""} onChange={(e) => setForm({ ...form, html_template: e.target.value })} />}
 
         <div className="row right">

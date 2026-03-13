@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import mimetypes
 from urllib.parse import quote
 
 import requests
@@ -37,7 +39,7 @@ def _build_mail_send_url(base_url: str, sender_id: str) -> str:
     return base
 
 
-def send_mail_html(subject: str, html_body: str, recipients_csv: str | None) -> None:
+def send_mail_html(subject: str, html_body: str, recipients_csv: str | None, attachments: list[str] | None = None) -> None:
     settings = get_settings()
     recipients = _normalize_recipients(recipients_csv)
 
@@ -62,10 +64,9 @@ def send_mail_html(subject: str, html_body: str, recipients_csv: str | None) -> 
         "recipients": [{"emailAddress": r, "recipientType": "TO"} for r in recipients],
     }
 
-    headers = {
+    headers_common = {
         "Authorization": settings.mail_token,
         "System-ID": settings.mail_system_id,
-        "Content-Type": "application/json",
     }
 
     send_url = _build_mail_send_url(settings.mail_api_url or "", settings.mail_sender_id)
@@ -73,11 +74,35 @@ def send_mail_html(subject: str, html_body: str, recipients_csv: str | None) -> 
         logger.warning("mail send url invalid")
         return
 
+    attach_list = [p for p in (attachments or []) if p]
+
     try:
-        r = requests.post(send_url, json=payload, headers=headers, timeout=20)
+        if not attach_list:
+            headers = dict(headers_common)
+            headers["Content-Type"] = "application/json"
+            r = requests.post(send_url, data=json.dumps(payload, ensure_ascii=False), headers=headers, timeout=20)
+        else:
+            files = [("mail", (None, json.dumps(payload, ensure_ascii=False), "application/json"))]
+            opened = []
+            for path in attach_list:
+                try:
+                    fname = path.split("/")[-1].split("\\")[-1]
+                    ctype = mimetypes.guess_type(fname)[0] or "application/octet-stream"
+                    fp = open(path, "rb")
+                    opened.append(fp)
+                    files.append(("attachments", (fname, fp, ctype)))
+                except Exception as e:
+                    logger.warning("mail attachment open failed path=%s err=%s", path, e)
+            r = requests.post(send_url, headers=headers_common, files=files, timeout=30)
+            for fp in opened:
+                try:
+                    fp.close()
+                except Exception:
+                    pass
+
         if not (200 <= r.status_code < 300):
             logger.warning("mail send failed status=%s url=%s body=%s", r.status_code, send_url, r.text[:500])
         else:
-            logger.info("mail sent. subject=%s recipients=%s", subject, len(recipients))
+            logger.info("mail sent. subject=%s recipients=%s attachments=%s", subject, len(recipients), len(attach_list))
     except Exception as exc:
         logger.warning("mail send exception: %s", exc)
