@@ -11,7 +11,7 @@ from app.schemas.dashboard import (
     NextScheduledRunItem,
     RecentFailedRunItem,
 )
-from app.services.artifact_service import build_preview_text, get_latest_artifact_for_task
+from app.services.artifact_service import build_preview_text
 from app.services.scheduler_service import get_scheduler_jobs
 
 logger = get_logger(__name__)
@@ -116,13 +116,21 @@ def get_dashboard_jobs() -> list[dict[str, str | int | bool | None]]:
 
 def get_dashboard_html_results(db: Session) -> list[DashboardHtmlResultItem]:
     try:
-        html_tasks = db.execute(
-            select(TaskDefinition).where(TaskDefinition.task_type == "html").order_by(TaskDefinition.id.asc())
-        ).scalars().all()
+        # python/sql task도 HTML artifact를 만들 수 있으므로 task_type으로 제한하지 않음
+        tasks = db.execute(select(TaskDefinition).order_by(TaskDefinition.id.asc())).scalars().all()
 
         items: list[DashboardHtmlResultItem] = []
-        for task in html_tasks:
-            latest_artifact = get_latest_artifact_for_task(db, task.id)
+        for task in tasks:
+            latest_artifact = db.execute(
+                select(TaskArtifact)
+                .where(and_(TaskArtifact.task_id == task.id, TaskArtifact.artifact_type == "html"))
+                .order_by(TaskArtifact.created_at.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+
+            # HTML artifact가 하나도 없는 task는 html-results 목록에서 제외
+            if not latest_artifact:
+                continue
 
             last_success = db.execute(
                 select(TaskRun)
